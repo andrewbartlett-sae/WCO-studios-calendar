@@ -189,3 +189,7 @@ function refreshCalendar() {
 }
 
 buildCalendar();
+
+setInterval(() => {
+  refreshCalendar();
+}, 60000);
