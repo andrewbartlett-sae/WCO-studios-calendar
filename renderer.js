@@ -204,6 +204,14 @@ async function buildCalendar() {
 }
 
 function refreshCalendar() {
+  // Update current header immediately for the chosen date
+  setHeaderTitle();
+
+  // Clear table and show Loading placeholder
+  const table = document.getElementById("calendarTable");
+  if (table) table.innerHTML = `<tr><td colspan="${feeds.length+1}" style="text-align:center; color:#eee; font-weight:bold; padding:20px;">Loading ${currentDate.toLocaleDateString()}</td></tr>`;
+
+  // Build calendar asynchronously
   buildCalendar().catch(err => console.error(err));
 }
 
