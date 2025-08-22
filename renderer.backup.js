@@ -1,19 +1,17 @@
-const feeds = [
-  { name: "Control Room A", url: "https://sae.webcheckout.net/feeds/calendar.ics?method=resource-type-schedule&a=D3AA7A7820164CAA6215DFE6E9501F&u=andrew.bartlett@sae.edu.au&resource-type=8902688" },
-  { name: "Control Room B", url: "https://sae.webcheckout.net/feeds/calendar.ics?method=resource-type-schedule&a=D3AA7A7820164CAA6215DFE6E9501F&u=andrew.bartlett@sae.edu.au&resource-type=8902868" },
-  { name: "Control Room C", url: "https://sae.webcheckout.net/feeds/calendar.ics?method=resource-type-schedule&a=D3AA7A7820164CAA6215DFE6E9501F&u=andrew.bartlett@sae.edu.au&resource-type=8902946" },
-  { name: "Control Room D", url: "https://sae.webcheckout.net/feeds/calendar.ics?method=resource-type-schedule&a=D3AA7A7820164CAA6215DFE6E9501F&u=andrew.bartlett@sae.edu.au&resource-type=8903030" },
-  { name: "Control Room E", url: "https://sae.webcheckout.net/feeds/calendar.ics?method=resource-type-schedule&a=D3AA7A7820164CAA6215DFE6E9501F&u=andrew.bartlett@sae.edu.au&resource-type=8903030" },
-  { name: "Control Room F", url: "https://sae.webcheckout.net/feeds/calendar.ics?method=resource-type-schedule&a=D3AA7A7820164CAA6215DFE6E9501F&u=andrew.bartlett@sae.edu.au&resource-type=8908918" },
-  { name: "Control Room G", url: "https://sae.webcheckout.net/feeds/calendar.ics?method=resource-type-schedule&a=D3AA7A7820164CAA6215DFE6E9501F&u=andrew.bartlett@sae.edu.au&resource-type=8909009" },
-  { name: "Mastering Suite", url: "https://sae.webcheckout.net/feeds/calendar.ics?method=resource-type-schedule&a=D3AA7A7820164CAA6215DFE6E9501F&u=andrew.bartlett@sae.edu.au&resource-type=8903180" },
-  { name: "Cyclorama", url: "https://sae.webcheckout.net/feeds/calendar.ics?method=resource-type-schedule&a=D3AA7A7820164CAA6215DFE6E9501F&u=andrew.bartlett@sae.edu.au&resource-type=10732978" },
-  { name: "Lecture Theatre", url: "https://sae.webcheckout.net/feeds/calendar.ics?method=resource-schedule&a=D3AA7A7820164CAA6215DFE6E9501F&u=andrew.bartlett@sae.edu.au&resource=34855656" }
-];
+const webAppUrl = "https://script.google.com/a/macros/sae.edu.au/s/AKfycbyMHnsDas6I5BgijywmpdufRa6AfTRsCGTkXZ_eC_pXKN9pEh-aVOvw2BAibSmJjU2I_w/exec";
 
+let feeds = [];
 let currentDate = new Date();
 const startHour = 8;
 const endHour = 21;
+
+// Fetch feeds from Apps Script
+async function fetchFeeds() {
+  const res = await fetch(webAppUrl);
+  if (!res.ok) throw new Error(`Failed to fetch feeds: ${res.status}`);
+  const data = await res.json();
+  return data;
+}
 
 function setHeaderTitle() {
   let header = document.getElementById("calendarHeader");
@@ -51,27 +49,6 @@ function addNavButtons() {
   }
 }
 
-// Safe fetch ICS
-async function loadFeed(url) {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`);
-    const text = await res.text();
-
-    if (!text.startsWith("BEGIN:VCALENDAR")) {
-      console.warn("Not valid ICS:", url);
-      return [];
-    }
-
-    const jcalData = ICAL.parse(text);
-    const comp = new ICAL.Component(jcalData);
-    return comp.getAllSubcomponents("vevent").map(e => new ICAL.Event(e));
-  } catch (err) {
-    console.error("Error fetching ICS:", url, err);
-    return [];
-  }
-}
-
 function toGMT8(icalTime) {
   const d = icalTime.toJSDate();
   const utcTime = d.getTime() + d.getTimezoneOffset() * 60000;
@@ -94,7 +71,9 @@ function findSlotIndex(date, slots) {
   return slots.indexOf(slotStr);
 }
 
+// Main calendar builder
 async function buildCalendar() {
+  feeds = await fetchFeeds();
   setHeaderTitle();
   addNavButtons();
 
@@ -102,23 +81,32 @@ async function buildCalendar() {
   const slots = getTimeSlots(startHour, endHour);
   const tableData = slots.map(() => feeds.map(() => []));
 
+  // Parse ICS events
   for (let i = 0; i < feeds.length; i++) {
-    const events = await loadFeed(feeds[i].url);
-    events.forEach(ev => {
-      const start = toGMT8(ev.startDate);
-      const end = toGMT8(ev.endDate);
-      if (start.toDateString() !== currentDate.toDateString()) return;
-      let index = findSlotIndex(start, slots);
-      const endIndex = findSlotIndex(end, slots);
-      if (index < 0) index = 0;
-      for (let s = index; s <= endIndex && s < slots.length; s++) {
-        tableData[s][i].push({ summary: ev.summary, start, end });
-      }
-    });
+    try {
+      const jcalData = ICAL.parse(feeds[i].ics);
+      const comp = new ICAL.Component(jcalData);
+      const events = comp.getAllSubcomponents("vevent").map(e => new ICAL.Event(e));
+      events.forEach(ev => {
+        const start = toGMT8(ev.startDate);
+        const end = toGMT8(ev.endDate);
+        if (start.toDateString() !== currentDate.toDateString()) return;
+        let index = findSlotIndex(start, slots);
+        const endIndex = findSlotIndex(end, slots);
+        if (index < 0) index = 0;
+        for (let s = index; s <= endIndex && s < slots.length; s++) {
+          tableData[s][i].push({ summary: ev.summary, start, end });
+        }
+      });
+    } catch(e) {
+      console.error(e);
+      for (let row of tableData) row[i] = [{ summary: "Error" }];
+    }
   }
 
+  // Render table
   const darkBg = "#1e1e1e";
-  const textColor = "#fff";
+  const textColor = "#eee";
   const availableBg = "#2a2a2a";
   const colWidth = `${Math.floor(100 / (feeds.length + 1))}%`;
   const rendered = Array.from({length: feeds.length}, () => 0);
@@ -161,19 +149,16 @@ async function buildCalendar() {
         const evEnd = ev.end;
         const isReservation = ev.summary.includes("Reservation");
         const isCheckout = ev.summary.includes("Checkout");
-        var isLate = false;
+        let isLate = false;
 
-        if (isReservation) { isLate = evStart < new Date(); }
-        if (isCheckout) { isLate = evEnd < new Date(); }
+        if (isReservation) isLate = evStart < new Date();
+        if (isCheckout) isLate = evEnd < new Date();
 
         let label = isReservation ? "Reservation" : isCheckout ? "Checkout" : "Booked";
-        if (isLate) {
-            label = label + " - LATE";
-            color = "red";
-        }
+        if (isLate) label = `Late ${label}`, color = "red";
 
-        if (isReservation) bgColor = "#4a90e2"; // Blue
-        if (isCheckout) bgColor = "#4caf50"; // Green
+        if (isReservation) bgColor = "#4a90e2";   // Blue
+        if (isCheckout) bgColor = "#4caf50";      // Green
 
         displayText = `${label}<br>${evStart.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${evEnd.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
       } else {
@@ -182,23 +167,17 @@ async function buildCalendar() {
           if (tableData[k][c].length) { nextEventTime = tableData[k][c][0].start; break; }
         }
         if (!nextEventTime) {
-          const lastSlotParts = slots[slots.length - 1].split(':');
           nextEventTime = new Date(currentDate);
-          nextEventTime.setHours(parseInt(lastSlotParts[0]), parseInt(lastSlotParts[1]), 0, 0);
+          nextEventTime.setHours(endHour, 0, 0, 0);
         }
 
-        if (nextEventTime < new Date()) {
-          displayText = "";
-        } else if (slotTime < new Date()) {
-          displayText = `Available until ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
-        } else {
-          displayText = `Available<br>${slotTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
-        }
+        if (nextEventTime < new Date()) displayText = "";
+        else if (slotTime < new Date()) displayText = `Available until ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+        else displayText = `Available<br>${slotTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
       }
 
       html += `<td style="background-color:${bgColor}; text-align:center; vertical-align:middle; color:${color}; width:${colWidth}; border:1px solid #555; font-weight:bold;" rowspan="${span}">${displayText}</td>`;
     }
-
     html += "</tr>";
   }
 
