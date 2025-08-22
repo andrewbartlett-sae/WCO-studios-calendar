@@ -5,6 +5,13 @@ let currentDate = new Date();
 const startHour = 8;
 const endHour = 21;
 
+// Helper: get system date with time zeroed
+function getToday() {
+  const d = new Date();
+  d.setHours(0,0,0,0);
+  return d;
+}
+
 // Fetch feeds from Apps Script
 async function fetchFeeds() {
   const res = await fetch(webAppUrl);
@@ -20,7 +27,7 @@ function setHeaderTitle() {
     header.id = "calendarHeader";
     header.style.color = "#eee";
     header.style.textAlign = "center";
-    header.style.margin = "10px 0";
+    header.style.marginBottom = "10px";
     header.style.fontSize = "1.2rem";
     document.body.prepend(header);
   }
@@ -39,23 +46,21 @@ function addNavButtons() {
 
     const prevBtn = document.createElement('button');
     prevBtn.textContent = "← Previous Day";
+    prevBtn.style.margin = "0 5px";
+    prevBtn.onclick = () => { currentDate.setDate(currentDate.getDate() - 1); refreshCalendar(); };
+    nav.appendChild(prevBtn);
+
     const todayBtn = document.createElement('button');
     todayBtn.textContent = "Today";
+    todayBtn.style.margin = "0 5px";
+    todayBtn.onclick = () => { currentDate = new Date(); refreshCalendar(); };
+    nav.appendChild(todayBtn);
+
     const nextBtn = document.createElement('button');
     nextBtn.textContent = "Next Day →";
-
-    [prevBtn, todayBtn, nextBtn].forEach(btn => {
-      btn.style.padding = "10px 15px";
-      btn.style.fontSize = "1rem";
-      btn.style.margin = "5px";
-      btn.style.borderRadius = "5px";
-      btn.style.cursor = "pointer";
-      nav.appendChild(btn);
-    });
-
-    prevBtn.onclick = () => { currentDate.setDate(currentDate.getDate() - 1); refreshCalendar(); };
-    todayBtn.onclick = () => { currentDate = new Date(); refreshCalendar(); };
+    nextBtn.style.margin = "0 5px";
     nextBtn.onclick = () => { currentDate.setDate(currentDate.getDate() + 1); refreshCalendar(); };
+    nav.appendChild(nextBtn);
   }
 }
 
@@ -81,9 +86,12 @@ function findSlotIndex(date, slots) {
   return slots.indexOf(slotStr);
 }
 
+// Main calendar builder
 async function buildCalendar() {
+  const now = new Date();
+  const today = getToday();
   const table = document.getElementById("calendarTable");
-  if (table) table.innerHTML = `<tr><td style="text-align:center; color:#eee; font-weight:bold; padding:20px;" colspan="${feeds.length+1}">Loading...</td></tr>`;
+  if (table) table.innerHTML = `<tr><td colspan="${feeds.length+1}" style="text-align:center; color:#eee; font-weight:bold; padding:20px;">Loading...</td></tr>`;
 
   feeds = await fetchFeeds();
   setHeaderTitle();
@@ -120,7 +128,7 @@ async function buildCalendar() {
     }
   }));
 
-  // Build HTML
+  // Render table
   let html = `<tr><th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555; font-weight:bold; font-size:0.9rem; padding:5px;">Time</th>`;
   feeds.forEach(f => {
     html += `<th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555; font-weight:bold; font-size:0.9rem; padding:5px;">${f.name}</th>`;
@@ -161,14 +169,15 @@ async function buildCalendar() {
         const isCheckout = ev.summary.includes("Checkout");
         let isLate = false;
 
-        if (isReservation) isLate = evStart < new Date();
-        if (isCheckout) isLate = evEnd < new Date();
+        // Late only if today and before now
+        if (isReservation) isLate = evStart < now && evStart.toDateString() === now.toDateString();
+        if (isCheckout) isLate = evEnd < now && evEnd.toDateString() === now.toDateString();
 
         let label = isReservation ? "Reservation" : isCheckout ? "Checkout" : "Booked";
         if (isLate) label = `Late ${label}`, color = "#F99";
 
-        if (isReservation) bgColor = "#4a90e2";   // Blue
-        if (isCheckout) bgColor = "#4caf50";      // Green
+        if (isReservation) bgColor = "#4a90e2";
+        if (isCheckout) bgColor = "#4caf50";
 
         displayText = `${label}<br>${evStart.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${evEnd.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
       } else {
@@ -181,8 +190,8 @@ async function buildCalendar() {
           nextEventTime.setHours(endHour, 0, 0, 0);
         }
 
-        if (nextEventTime < new Date()) displayText = "";
-        else if (slotTime < new Date()) displayText = `Available until ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+        if (nextEventTime < now) displayText = "";
+        else if (slotTime < now) displayText = `Available until ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
         else displayText = `Available<br>${slotTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
       }
 
@@ -198,5 +207,8 @@ function refreshCalendar() {
   buildCalendar().catch(err => console.error(err));
 }
 
+// Initial load
 buildCalendar();
+
+// Auto-refresh every 1 minute
 setInterval(refreshCalendar, 60000);
