@@ -4,56 +4,56 @@ let feeds = [];
 let currentDate = new Date();
 const startHour = 8;
 const endHour = 21;
-const version = "v1.2"; // Version number
-
-// Track ongoing fetches
-let currentAbortController = null;
+const version = "v1.1"; // Version number bumped since logic changed
 
 async function fetchFeeds() {
-  if (feeds.length > 0) return feeds; // Only fetch once
-
-  if (currentAbortController) currentAbortController.abort();
-  currentAbortController = new AbortController();
-  const signal = currentAbortController.signal;
-
-  const res = await fetch(webAppUrl, { signal });
+  const res = await fetch(webAppUrl);
   if (!res.ok) throw new Error(`Failed to fetch feeds: ${res.status}`);
-  const data = await res.json();
-  feeds = data;
-  return feeds;
+  return await res.json();
 }
 
 function setHeaderTitle() {
   let header = document.getElementById("calendarHeader");
   if (!header) {
-    header = document.createElement("h1");
+    header = document.createElement('h1');
     header.id = "calendarHeader";
+    header.style.color = "#eee";
+    header.style.textAlign = "center";
+    header.style.marginBottom = "5px";
     document.body.prepend(header);
 
     // Version number (small, subtle)
     const versionTag = document.createElement("div");
     versionTag.id = "calendarVersion";
     versionTag.textContent = version;
+    versionTag.style.color = "#888";
+    versionTag.style.fontSize = "10px";
+    versionTag.style.textAlign = "center";
+    versionTag.style.marginBottom = "20px";
     document.body.insertBefore(versionTag, header.nextSibling);
   }
-  const options = { weekday: "long", day: "numeric", month: "long", year: "numeric" };
-  header.textContent = `Studio Availability – ${currentDate.toLocaleDateString("en-GB", options)}`;
+  const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+  header.textContent = `Studio Availability – ${currentDate.toLocaleDateString('en-GB', options)}`;
 }
 
 function addNavButtons() {
   let nav = document.getElementById("calendarNav");
   if (!nav) {
-    nav = document.createElement("div");
+    nav = document.createElement('div');
     nav.id = "calendarNav";
+    nav.style.textAlign = "center";
+    nav.style.marginBottom = "10px";
     document.body.prepend(nav);
 
-    const prevBtn = document.createElement("button");
+    const prevBtn = document.createElement('button');
     prevBtn.textContent = "← Previous Day";
+    prevBtn.style.marginRight = "10px";
     prevBtn.onclick = () => { changeDay(-1); };
     nav.appendChild(prevBtn);
 
-    const todayBtn = document.createElement("button");
+    const todayBtn = document.createElement('button');
     todayBtn.textContent = "Today";
+    todayBtn.style.marginRight = "10px";
     todayBtn.onclick = () => {
       currentDate = new Date(); // Always system date
       clearCalendar();
@@ -62,7 +62,7 @@ function addNavButtons() {
     };
     nav.appendChild(todayBtn);
 
-    const nextBtn = document.createElement("button");
+    const nextBtn = document.createElement('button');
     nextBtn.textContent = "Next Day →";
     nextBtn.onclick = () => { changeDay(1); };
     nav.appendChild(nextBtn);
@@ -78,7 +78,7 @@ function changeDay(delta) {
 
 function clearCalendar() {
   const table = document.getElementById("calendarTable");
-  table.innerHTML = `<tr><td colspan="${feeds.length + 1}" class="loading-cell">Loading...</td></tr>`;
+  table.innerHTML = `<tr><td colspan="${feeds.length + 1}" style="color:#eee; text-align:center; padding:20px; font-weight:bold;">Loading...</td></tr>`;
 }
 
 function toGMT8(icalTime) {
@@ -90,8 +90,8 @@ function toGMT8(icalTime) {
 function getTimeSlots(startHour, endHour) {
   const slots = [];
   for (let h = startHour; h <= endHour; h++) {
-    slots.push(`${String(h).padStart(2,"0")}:00`);
-    if (h < endHour) slots.push(`${String(h).padStart(2,"0")}:30`);
+    slots.push(`${String(h).padStart(2,'0')}:00`);
+    if (h < endHour) slots.push(`${String(h).padStart(2,'0')}:30`);
   }
   return slots;
 }
@@ -99,23 +99,11 @@ function getTimeSlots(startHour, endHour) {
 function findSlotIndex(date, slots) {
   const h = date.getHours();
   const m = date.getMinutes();
-  const slotStr = `${String(h).padStart(2,"0")}:${m < 30 ? "00" : "30"}`;
+  const slotStr = `${String(h).padStart(2,'0')}:${m < 30 ? '00' : '30'}`;
   return slots.indexOf(slotStr);
 }
 
 async function buildCalendar() {
-  try {
-    feeds = await fetchFeeds();
-  } catch (err) {
-    if (err.name === "AbortError") {
-      console.log("Previous fetch aborted.");
-      return;
-    } else {
-      console.error(err);
-      return;
-    }
-  }
-
   const table = document.getElementById("calendarTable");
   const slots = getTimeSlots(startHour, endHour);
   const tableData = slots.map(() => feeds.map(() => []));
@@ -136,25 +124,31 @@ async function buildCalendar() {
           tableData[s][i].push({ summary: ev.summary, start, end });
         }
       });
-    } catch (e) {
+    } catch(e) {
       console.error(e);
       for (let row of tableData) row[i] = [{ summary: "Error" }];
     }
   }
 
-  const rendered = Array.from({ length: feeds.length }, () => 0);
+  const darkBg = "#1e1e1e";
+  const textColor = "#eee";
+  const availableBg = "#2a2a2a";
+  const colWidth = `${Math.floor(100 / (feeds.length + 1))}%`;
+  const rendered = Array.from({length: feeds.length}, () => 0);
 
-  let html = `<tr><th class="time-col">Time</th>`;
-  feeds.forEach(f => { html += `<th class="feed-col">${f.name}</th>`; });
+  let html = `<tr><th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555">Time</th>`;
+  feeds.forEach(f => {
+    html += `<th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555">${f.name}</th>`;
+  });
   html += "</tr>";
 
   for (let r = 0; r < slots.length; r++) {
-    const [slotHour, slotMinute] = slots[r].split(":").map(Number);
+    const [slotHour, slotMinute] = slots[r].split(':').map(Number);
     const slotTime = new Date(currentDate);
     slotTime.setHours(slotHour, slotMinute, 0, 0);
 
-    const timeLabel = slotTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-    html += `<tr><td class="time-cell">${timeLabel}</td>`;
+    const timeLabel = slotTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    html += `<tr><td style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555; font-weight:bold;">${timeLabel}</td>`;
 
     for (let c = 0; c < feeds.length; c++) {
       if (rendered[c] > 0) { rendered[c]--; continue; }
@@ -171,7 +165,8 @@ async function buildCalendar() {
       }
       rendered[c] = span - 1;
 
-      let cssClass = "available";
+      let bgColor = availableBg;
+      let color = textColor;
 
       if (cellEvents.length) {
         const ev = cellEvents[0];
@@ -185,12 +180,12 @@ async function buildCalendar() {
         if (isCheckout) isLate = evEnd < new Date();
 
         let label = isReservation ? "Reservation" : isCheckout ? "Checkout" : "Booked";
-        if (isLate) { label = `Late ${label}`; cssClass = "late"; }
-        else if (isReservation) cssClass = "reservation";
-        else if (isCheckout) cssClass = "checkout";
-        else cssClass = "booked";
+        if (isLate) label = `Late ${label}`, color = "#FAA";
 
-        displayText = `${label}<br>${evStart.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} - ${evEnd.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+        if (isReservation) bgColor = "#4a90e2";
+        if (isCheckout) bgColor = "#4caf50";
+
+        displayText = `${label}<br>${evStart.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${evEnd.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
       } else {
         let nextEventTime = null;
         for (let k = r + 1; k < slots.length; k++) {
@@ -202,11 +197,11 @@ async function buildCalendar() {
         }
 
         if (nextEventTime < new Date()) displayText = "";
-        else if (slotTime < new Date()) displayText = `Available until ${nextEventTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
-        else displayText = `Available<br>${slotTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} - ${nextEventTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+        else if (slotTime < new Date()) displayText = `Available until ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+        else displayText = `Available<br>${slotTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
       }
 
-      html += `<td class="cell ${cssClass}" rowspan="${span}">${displayText}</td>`;
+      html += `<td style="background-color:${bgColor}; text-align:center; vertical-align:middle; color:${color}; width:${colWidth}; border:1px solid #555; font-weight:bold;" rowspan="${span}">${displayText}</td>`;
     }
     html += "</tr>";
   }
@@ -218,8 +213,13 @@ function refreshCalendar() {
   buildCalendar().catch(err => console.error(err));
 }
 
+// ---- INITIAL LOAD ----
 addNavButtons();
 setHeaderTitle();
 clearCalendar();
-refreshCalendar();
-setInterval(refreshCalendar, 60000);
+
+fetchFeeds().then(data => {
+  feeds = data;
+  refreshCalendar();
+  setInterval(refreshCalendar, 60000);
+}).catch(err => console.error(err));
