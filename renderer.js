@@ -4,22 +4,12 @@ let feeds = [];
 let currentDate = new Date();
 const startHour = 8;
 const endHour = 21;
-const version = "v1.0"; // Version number
-
-// Track ongoing fetches
-let currentAbortController = null;
+const version = "v1.1"; // Version number bumped since logic changed
 
 async function fetchFeeds() {
-  if (currentAbortController) {
-    currentAbortController.abort();
-  }
-  currentAbortController = new AbortController();
-  const signal = currentAbortController.signal;
-
-  const res = await fetch(webAppUrl, { signal });
+  const res = await fetch(webAppUrl);
   if (!res.ok) throw new Error(`Failed to fetch feeds: ${res.status}`);
-  const data = await res.json();
-  return data;
+  return await res.json();
 }
 
 function setHeaderTitle() {
@@ -114,18 +104,6 @@ function findSlotIndex(date, slots) {
 }
 
 async function buildCalendar() {
-  try {
-    feeds = await fetchFeeds();
-  } catch (err) {
-    if (err.name === 'AbortError') {
-      console.log("Previous fetch aborted.");
-      return;
-    } else {
-      console.error(err);
-      return;
-    }
-  }
-
   const table = document.getElementById("calendarTable");
   const slots = getTimeSlots(startHour, endHour);
   const tableData = slots.map(() => feeds.map(() => []));
@@ -232,13 +210,16 @@ async function buildCalendar() {
 }
 
 function refreshCalendar() {
-  //clearCalendar();
   buildCalendar().catch(err => console.error(err));
 }
 
+// ---- INITIAL LOAD ----
 addNavButtons();
 setHeaderTitle();
 clearCalendar();
-refreshCalendar();
 
-setInterval(refreshCalendar, 60000);
+fetchFeeds().then(data => {
+  feeds = data;
+  refreshCalendar();
+  setInterval(refreshCalendar, 60000);
+}).catch(err => console.error(err));
