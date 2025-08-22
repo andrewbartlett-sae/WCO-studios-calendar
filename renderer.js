@@ -4,12 +4,15 @@ let feeds = [];
 let currentDate = new Date();
 const startHour = 8;
 const endHour = 21;
+const version = "v1.0"; // Version number
 
 // Track ongoing fetches
 let currentAbortController = null;
 
 async function fetchFeeds() {
-  if (currentAbortController) currentAbortController.abort();
+  if (currentAbortController) {
+    currentAbortController.abort();
+  }
   currentAbortController = new AbortController();
   const signal = currentAbortController.signal;
 
@@ -26,8 +29,18 @@ function setHeaderTitle() {
     header.id = "calendarHeader";
     header.style.color = "#eee";
     header.style.textAlign = "center";
-    header.style.marginBottom = "20px";
+    header.style.marginBottom = "5px";
     document.body.prepend(header);
+
+    // Version number (small, subtle)
+    const versionTag = document.createElement("div");
+    versionTag.id = "calendarVersion";
+    versionTag.textContent = version;
+    versionTag.style.color = "#888";
+    versionTag.style.fontSize = "10px";
+    versionTag.style.textAlign = "center";
+    versionTag.style.marginBottom = "20px";
+    document.body.insertBefore(versionTag, header.nextSibling);
   }
   const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
   header.textContent = `Studio Availability – ${currentDate.toLocaleDateString('en-GB', options)}`;
@@ -52,7 +65,7 @@ function addNavButtons() {
     todayBtn.textContent = "Today";
     todayBtn.style.marginRight = "10px";
     todayBtn.onclick = () => {
-      currentDate = new Date(); // always system "today"
+      currentDate = new Date(); // Always system date
       clearCalendar();
       setHeaderTitle();
       refreshCalendar();
@@ -219,14 +232,13 @@ async function buildCalendar() {
 }
 
 function refreshCalendar() {
-  clearCalendar();
-  setHeaderTitle();
+  //clearCalendar();
   buildCalendar().catch(err => console.error(err));
 }
 
 addNavButtons();
-clearCalendar();
 setHeaderTitle();
+clearCalendar();
 refreshCalendar();
 
 setInterval(refreshCalendar, 60000);
