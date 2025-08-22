@@ -48,9 +48,11 @@ function addNavButtons() {
     todayBtn.textContent = "Today";
     todayBtn.style.marginRight = "10px";
     todayBtn.onclick = () => {
-        currentDate = new Date();
+        const now = new Date();
+        currentDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         cancelPreviousRequests();
         clearCalendar();
+        showLoading();
         setHeaderTitle();
         buildCalendar();
     };
@@ -67,6 +69,7 @@ function changeDay(offset) {
   currentDate.setDate(currentDate.getDate() + offset);
   cancelPreviousRequests();
   clearCalendar();
+  showLoading();
   setHeaderTitle();
   buildCalendar();
 }
@@ -79,6 +82,11 @@ function cancelPreviousRequests() {
 function clearCalendar() {
   const table = document.getElementById("calendarTable");
   if (table) table.innerHTML = "";
+}
+
+function showLoading() {
+  const table = document.getElementById("calendarTable");
+  table.innerHTML = `<tr><td colspan="${feeds.length + 1}" style="text-align:center; color:#eee; font-weight:bold; background:#1e1e1e; padding:20px;">Loading…</td></tr>`;
 }
 
 function toGMT8(icalTime) {
@@ -106,7 +114,6 @@ function findSlotIndex(date, slots) {
 // Build calendar table
 async function buildCalendar() {
   feeds = await fetchFeeds();
-  setHeaderTitle();
   addNavButtons();
 
   const table = document.getElementById("calendarTable");
@@ -119,7 +126,7 @@ async function buildCalendar() {
   const colWidth = `${Math.floor(100 / (feeds.length + 1))}%`;
   const rendered = Array.from({length: feeds.length}, () => 0);
 
-  // Start rendering an empty table
+  // Initialize table with headers
   let html = `<tr><th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555">Time</th>`;
   feeds.forEach(f => {
     html += `<th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555">${f.name}</th>`;
@@ -127,7 +134,7 @@ async function buildCalendar() {
   html += "</tr>";
   table.innerHTML = html;
 
-  // Load each feed in parallel
+  // Load feeds in parallel
   feeds.forEach((feed, i) => {
     const controller = new AbortController();
     pendingControllers.push(controller);
@@ -137,6 +144,7 @@ async function buildCalendar() {
         const jcalData = ICAL.parse(feed.ics);
         const comp = new ICAL.Component(jcalData);
         const events = comp.getAllSubcomponents("vevent").map(e => new ICAL.Event(e));
+
         events.forEach(ev => {
           const start = toGMT8(ev.startDate);
           const end = toGMT8(ev.endDate);
@@ -148,6 +156,7 @@ async function buildCalendar() {
             tableData[s][i].push({ summary: ev.summary, start, end });
           }
         });
+
         renderTablePartial(table, slots, tableData, rendered, darkBg, textColor, availableBg, colWidth);
       } catch(e) {
         console.error("Error parsing ICS:", e);
@@ -237,13 +246,15 @@ function renderTablePartial(table, slots, tableData, rendered, darkBg, textColor
 function refreshCalendar() {
   cancelPreviousRequests();
   clearCalendar();
+  showLoading();
   buildCalendar().catch(err => console.error(err));
 }
 
-// initial build
+// Initial build
+showLoading();
 buildCalendar();
 
-// auto-refresh every 1 minute
+// Auto-refresh every 1 minute
 setInterval(() => {
   refreshCalendar();
 }, 60000);
