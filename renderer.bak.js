@@ -4,13 +4,12 @@ let feeds = [];
 let currentDate = new Date();
 const startHour = 8;
 const endHour = 21;
+const version = "v1.1"; // Version number bumped since logic changed
 
-// Fetch feeds from Apps Script
 async function fetchFeeds() {
   const res = await fetch(webAppUrl);
   if (!res.ok) throw new Error(`Failed to fetch feeds: ${res.status}`);
-  const data = await res.json();
-  return data;
+  return await res.json();
 }
 
 function setHeaderTitle() {
@@ -20,11 +19,21 @@ function setHeaderTitle() {
     header.id = "calendarHeader";
     header.style.color = "#eee";
     header.style.textAlign = "center";
-    header.style.marginBottom = "20px";
+    header.style.marginBottom = "5px";
     document.body.prepend(header);
+
+    // Version number (small, subtle)
+    const versionTag = document.createElement("div");
+    versionTag.id = "calendarVersion";
+    versionTag.textContent = version;
+    versionTag.style.color = "#888";
+    versionTag.style.fontSize = "10px";
+    versionTag.style.textAlign = "center";
+    versionTag.style.marginBottom = "20px";
+    document.body.insertBefore(versionTag, header.nextSibling);
   }
   const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-  header.textContent = `Studio Availability – ${currentDate.toLocaleDateString('en-GB', options)}`;
+  header.textContent = `Studio Availability â€“ ${currentDate.toLocaleDateString('en-GB', options)}`;
 }
 
 function addNavButtons() {
@@ -37,16 +46,39 @@ function addNavButtons() {
     document.body.prepend(nav);
 
     const prevBtn = document.createElement('button');
-    prevBtn.textContent = "← Previous Day";
+    prevBtn.textContent = "â† Previous Day";
     prevBtn.style.marginRight = "10px";
-    prevBtn.onclick = () => { currentDate.setDate(currentDate.getDate() - 1); refreshCalendar(); };
+    prevBtn.onclick = () => { changeDay(-1); };
     nav.appendChild(prevBtn);
 
+    const todayBtn = document.createElement('button');
+    todayBtn.textContent = "Today";
+    todayBtn.style.marginRight = "10px";
+    todayBtn.onclick = () => {
+      currentDate = new Date(); // Always system date
+      clearCalendar();
+      setHeaderTitle();
+      refreshCalendar();
+    };
+    nav.appendChild(todayBtn);
+
     const nextBtn = document.createElement('button');
-    nextBtn.textContent = "Next Day →";
-    nextBtn.onclick = () => { currentDate.setDate(currentDate.getDate() + 1); refreshCalendar(); };
+    nextBtn.textContent = "Next Day â†’";
+    nextBtn.onclick = () => { changeDay(1); };
     nav.appendChild(nextBtn);
   }
+}
+
+function changeDay(delta) {
+  currentDate.setDate(currentDate.getDate() + delta);
+  clearCalendar();
+  setHeaderTitle();
+  refreshCalendar();
+}
+
+function clearCalendar() {
+  const table = document.getElementById("calendarTable");
+  table.innerHTML = `<tr><td colspan="${feeds.length + 1}" style="color:#eee; text-align:center; padding:20px; font-weight:bold;">Loading...</td></tr>`;
 }
 
 function toGMT8(icalTime) {
@@ -71,17 +103,11 @@ function findSlotIndex(date, slots) {
   return slots.indexOf(slotStr);
 }
 
-// Main calendar builder
 async function buildCalendar() {
-  feeds = await fetchFeeds();
-  setHeaderTitle();
-  addNavButtons();
-
   const table = document.getElementById("calendarTable");
   const slots = getTimeSlots(startHour, endHour);
   const tableData = slots.map(() => feeds.map(() => []));
 
-  // Parse ICS events
   for (let i = 0; i < feeds.length; i++) {
     try {
       const jcalData = ICAL.parse(feeds[i].ics);
@@ -104,7 +130,6 @@ async function buildCalendar() {
     }
   }
 
-  // Render table
   const darkBg = "#1e1e1e";
   const textColor = "#eee";
   const availableBg = "#2a2a2a";
@@ -151,14 +176,14 @@ async function buildCalendar() {
         const isCheckout = ev.summary.includes("Checkout");
         let isLate = false;
 
-        if (isReservation) isLate = evStart < new Date();
+        if (isReservation) isLate = evStart < new Date(Date.now() - 30 * 60 * 1000);
         if (isCheckout) isLate = evEnd < new Date();
 
         let label = isReservation ? "Reservation" : isCheckout ? "Checkout" : "Booked";
         if (isLate) label = `Late ${label}`, color = "#FAA";
 
-        if (isReservation) bgColor = "#4a90e2";   // Blue
-        if (isCheckout) bgColor = "#4caf50";      // Green
+        if (isReservation) bgColor = "#4a90e2";
+        if (isCheckout) bgColor = "#4caf50";
 
         displayText = `${label}<br>${evStart.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${evEnd.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
       } else {
@@ -188,8 +213,13 @@ function refreshCalendar() {
   buildCalendar().catch(err => console.error(err));
 }
 
-buildCalendar();
+// ---- INITIAL LOAD ----
+addNavButtons();
+setHeaderTitle();
+clearCalendar();
 
-setInterval(() => {
+fetchFeeds().then(data => {
+  feeds = data;
   refreshCalendar();
-}, 60000);
+  setInterval(refreshCalendar, 60000);
+}).catch(err => console.error(err));
