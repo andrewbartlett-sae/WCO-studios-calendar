@@ -4,7 +4,7 @@ let feeds = [];
 let currentDate = new Date();
 const startHour = 8;
 const endHour = 21;
-const version = "v1.0"; // Version number
+const version = "v1.01"; // Version number
 
 // Track ongoing fetches
 let currentAbortController = null;
