@@ -155,7 +155,7 @@ async function buildCalendar() {
         if (isCheckout) isLate = evEnd < new Date();
 
         let label = isReservation ? "Reservation" : isCheckout ? "Checkout" : "Booked";
-        if (isLate) label = `Late ${label}`, color = "#F99";
+        if (isLate) label = `Late ${label}`, color = "#FAA";
 
         if (isReservation) bgColor = "#4a90e2";   // Blue
         if (isCheckout) bgColor = "#4caf50";      // Green
