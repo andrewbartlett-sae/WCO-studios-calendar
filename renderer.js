@@ -39,12 +39,20 @@ function addNavButtons() {
     const prevBtn = document.createElement('button');
     prevBtn.textContent = "← Previous Day";
     prevBtn.style.marginRight = "10px";
-    prevBtn.onclick = () => { currentDate.setDate(currentDate.getDate() - 1); refreshCalendar(); };
+    prevBtn.onclick = () => { 
+      currentDate.setDate(currentDate.getDate() - 1); 
+      renderEmptyTable(); 
+      fetchAndBuildCalendar(); 
+    };
     nav.appendChild(prevBtn);
 
     const nextBtn = document.createElement('button');
     nextBtn.textContent = "Next Day →";
-    nextBtn.onclick = () => { currentDate.setDate(currentDate.getDate() + 1); refreshCalendar(); };
+    nextBtn.onclick = () => { 
+      currentDate.setDate(currentDate.getDate() + 1); 
+      renderEmptyTable(); 
+      fetchAndBuildCalendar(); 
+    };
     nav.appendChild(nextBtn);
   }
 }
@@ -71,40 +79,77 @@ function findSlotIndex(date, slots) {
   return slots.indexOf(slotStr);
 }
 
-// Main calendar builder
-async function buildCalendar() {
-  feeds = await fetchFeeds();
+// Immediately render empty table to allow fast day navigation
+function renderEmptyTable() {
   setHeaderTitle();
   addNavButtons();
 
   const table = document.getElementById("calendarTable");
   const slots = getTimeSlots(startHour, endHour);
-  const tableData = slots.map(() => feeds.map(() => []));
+  const darkBg = "#1e1e1e";
+  const textColor = "#eee";
+  const colWidth = `${Math.floor(100 / (feeds.length + 1))}%`;
 
-  // Parse ICS events
-  for (let i = 0; i < feeds.length; i++) {
-    try {
-      const jcalData = ICAL.parse(feeds[i].ics);
-      const comp = new ICAL.Component(jcalData);
-      const events = comp.getAllSubcomponents("vevent").map(e => new ICAL.Event(e));
-      events.forEach(ev => {
-        const start = toGMT8(ev.startDate);
-        const end = toGMT8(ev.endDate);
-        if (start.toDateString() !== currentDate.toDateString()) return;
-        let index = findSlotIndex(start, slots);
-        const endIndex = findSlotIndex(end, slots);
-        if (index < 0) index = 0;
-        for (let s = index; s <= endIndex && s < slots.length; s++) {
-          tableData[s][i].push({ summary: ev.summary, start, end });
-        }
-      });
-    } catch(e) {
-      console.error(e);
-      for (let row of tableData) row[i] = [{ summary: "Error" }];
-    }
+  let html = `<tr><th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555">Time</th>`;
+  feeds.forEach(f => {
+    html += `<th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555">${f.name}</th>`;
+  });
+  html += "</tr>";
+
+  slots.forEach(slot => {
+    html += `<tr><td style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555; font-weight:bold;">${slot}</td>`;
+    feeds.forEach(() => {
+      html += `<td style="background-color:#2a2a2a; color:${textColor}; text-align:center; font-weight:bold;">Loading...</td>`;
+    });
+    html += `</tr>`;
+  });
+
+  table.innerHTML = html;
+}
+
+// Fetch ICS and build the calendar asynchronously
+async function fetchAndBuildCalendar() {
+  try {
+    feeds = await fetchFeeds();
+  } catch(e) {
+    console.error("Failed to fetch feeds", e);
+    return;
   }
 
-  // Render table
+  const table = document.getElementById("calendarTable");
+  const slots = getTimeSlots(startHour, endHour);
+  const tableData = slots.map(() => feeds.map(() => []));
+
+  // Load ICS events asynchronously without blocking UI
+  feeds.forEach((feed, i) => {
+    setTimeout(async () => {
+      try {
+        const jcalData = ICAL.parse(feed.ics);
+        const comp = new ICAL.Component(jcalData);
+        const events = comp.getAllSubcomponents("vevent").map(e => new ICAL.Event(e));
+        events.forEach(ev => {
+          const start = toGMT8(ev.startDate);
+          const end = toGMT8(ev.endDate);
+          if (start.toDateString() !== currentDate.toDateString()) return;
+          let index = findSlotIndex(start, slots);
+          const endIndex = findSlotIndex(end, slots);
+          if (index < 0) index = 0;
+          for (let s = index; s <= endIndex && s < slots.length; s++) {
+            tableData[s][i].push({ summary: ev.summary, start, end });
+          }
+        });
+        renderCalendarData(tableData); // render each feed as it loads
+      } catch(e) {
+        console.error(`Error parsing ICS for ${feed.name}`, e);
+      }
+    }, i * 200); // stagger requests to avoid blocking
+  });
+}
+
+// Render tableData to the table
+function renderCalendarData(tableData) {
+  const table = document.getElementById("calendarTable");
+  const slots = getTimeSlots(startHour, endHour);
   const darkBg = "#1e1e1e";
   const textColor = "#eee";
   const availableBg = "#2a2a2a";
@@ -122,8 +167,7 @@ async function buildCalendar() {
     const slotTime = new Date(currentDate);
     slotTime.setHours(slotHour, slotMinute, 0, 0);
 
-    const timeLabel = slotTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    html += `<tr><td style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555; font-weight:bold;">${timeLabel}</td>`;
+    html += `<tr><td style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555; font-weight:bold;">${slotTime.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' })}</td>`;
 
     for (let c = 0; c < feeds.length; c++) {
       if (rendered[c] > 0) { rendered[c]--; continue; }
@@ -131,7 +175,6 @@ async function buildCalendar() {
       const cellEvents = tableData[r][c];
       let displayText = "";
       let span = 1;
-
       for (let k = r + 1; k < slots.length; k++) {
         const nextEvents = tableData[k][c];
         const nextContent = nextEvents.length ? nextEvents[0].summary : "Available";
@@ -155,12 +198,12 @@ async function buildCalendar() {
         if (isCheckout) isLate = evEnd < new Date();
 
         let label = isReservation ? "Reservation" : isCheckout ? "Checkout" : "Booked";
-        if (isLate) label = `Late ${label}`, color = "#FAA";
+        if (isLate) label = `Late ${label}`, color = "#F99";
 
         if (isReservation) bgColor = "#4a90e2";   // Blue
         if (isCheckout) bgColor = "#4caf50";      // Green
 
-        displayText = `${label}<br>${evStart.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${evEnd.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+        displayText = `${label}<br>${evStart.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' })} - ${evEnd.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' })}`;
       } else {
         let nextEventTime = null;
         for (let k = r + 1; k < slots.length; k++) {
@@ -172,11 +215,11 @@ async function buildCalendar() {
         }
 
         if (nextEventTime < new Date()) displayText = "";
-        else if (slotTime < new Date()) displayText = `Available until ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
-        else displayText = `Available<br>${slotTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+        else if (slotTime < new Date()) displayText = `Available until ${nextEventTime.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' })}`;
+        else displayText = `Available<br>${slotTime.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' })} - ${nextEventTime.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' })}`;
       }
 
-      html += `<td style="background-color:${bgColor}; text-align:center; vertical-align:middle; color:${color}; width:${colWidth}; border:1px solid #555; font-weight:bold;" rowspan="${span}">${displayText}</td>`;
+      html += `<td style="background-color:${bgColor}; color:${color}; text-align:center; vertical-align:middle; width:${colWidth}; border:1px solid #555; font-weight:bold;" rowspan="${span}">${displayText}</td>`;
     }
     html += "</tr>";
   }
@@ -185,11 +228,13 @@ async function buildCalendar() {
 }
 
 function refreshCalendar() {
-  buildCalendar().catch(err => console.error(err));
+  renderEmptyTable();
+  fetchAndBuildCalendar();
 }
 
-buildCalendar();
+// Initial load
+renderEmptyTable();
+fetchAndBuildCalendar();
 
-setInterval(() => {
-  refreshCalendar();
-}, 60000);
+// Auto-refresh every 60 seconds
+setInterval(refreshCalendar, 60000);
