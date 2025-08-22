@@ -198,7 +198,7 @@ async function buildCalendar() {
         const isCheckout = ev.summary.includes("Checkout");
         let isLate = false;
 
-        if (isReservation) isLate = evStart < new Date();
+        if (isReservation) isLate = evStart < new Date(Date.now() - 30 * 60 * 1000);
         if (isCheckout) isLate = evEnd < new Date();
 
         let label = isReservation ? "Reservation" : isCheckout ? "Checkout" : "Booked";
