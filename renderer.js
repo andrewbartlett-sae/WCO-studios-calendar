@@ -27,6 +27,18 @@ function setHeaderTitle() {
   header.textContent = `Studio Availability – ${currentDate.toLocaleDateString('en-GB', options)}`;
 }
 
+const todayBtn = document.createElement('button');
+todayBtn.textContent = "Today";
+todayBtn.style.marginRight = "10px";
+todayBtn.onclick = () => {
+    currentDate = new Date();  // reset to today
+    cancelPreviousRequests();  // cancel any in-progress feed loads
+    clearCalendar();           // clear the table immediately
+    setHeaderTitle();          // update the date header
+    buildCalendar();           // rebuild the calendar
+};
+nav.appendChild(todayBtn);
+
 function addNavButtons() {
   let nav = document.getElementById("calendarNav");
   if (!nav) {
@@ -41,6 +53,18 @@ function addNavButtons() {
     prevBtn.style.marginRight = "10px";
     prevBtn.onclick = () => { changeDay(-1); };
     nav.appendChild(prevBtn);
+
+    const todayBtn = document.createElement('button');
+    todayBtn.textContent = "Today";
+    todayBtn.style.marginRight = "10px";
+    todayBtn.onclick = () => {
+        currentDate = new Date();
+        cancelPreviousRequests();
+        clearCalendar();
+        setHeaderTitle();
+        buildCalendar();
+    };
+    nav.appendChild(todayBtn);
 
     const nextBtn = document.createElement('button');
     nextBtn.textContent = "Next Day →";
