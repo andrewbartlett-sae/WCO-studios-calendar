@@ -20,7 +20,8 @@ function setHeaderTitle() {
     header.id = "calendarHeader";
     header.style.color = "#eee";
     header.style.textAlign = "center";
-    header.style.marginBottom = "20px";
+    header.style.margin = "10px 0";
+    header.style.fontSize = "1.2rem";
     document.body.prepend(header);
   }
   const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
@@ -38,20 +39,23 @@ function addNavButtons() {
 
     const prevBtn = document.createElement('button');
     prevBtn.textContent = "← Previous Day";
-    prevBtn.style.marginRight = "10px";
-    prevBtn.onclick = () => { currentDate.setDate(currentDate.getDate() - 1); refreshCalendar(); };
-    nav.appendChild(prevBtn);
-
     const todayBtn = document.createElement('button');
     todayBtn.textContent = "Today";
-    todayBtn.style.marginRight = "10px";
-    todayBtn.onclick = () => { currentDate = new Date(); refreshCalendar(); };
-    nav.appendChild(todayBtn);
-
     const nextBtn = document.createElement('button');
     nextBtn.textContent = "Next Day →";
+
+    [prevBtn, todayBtn, nextBtn].forEach(btn => {
+      btn.style.padding = "10px 15px";
+      btn.style.fontSize = "1rem";
+      btn.style.margin = "5px";
+      btn.style.borderRadius = "5px";
+      btn.style.cursor = "pointer";
+      nav.appendChild(btn);
+    });
+
+    prevBtn.onclick = () => { currentDate.setDate(currentDate.getDate() - 1); refreshCalendar(); };
+    todayBtn.onclick = () => { currentDate = new Date(); refreshCalendar(); };
     nextBtn.onclick = () => { currentDate.setDate(currentDate.getDate() + 1); refreshCalendar(); };
-    nav.appendChild(nextBtn);
   }
 }
 
@@ -77,11 +81,9 @@ function findSlotIndex(date, slots) {
   return slots.indexOf(slotStr);
 }
 
-// Build the calendar table
 async function buildCalendar() {
-  // Clear table and show loading
   const table = document.getElementById("calendarTable");
-  table.innerHTML = `<tr><td style="color:#eee; text-align:center; padding:20px;" colspan="${feeds.length + 1}">Loading...</td></tr>`;
+  if (table) table.innerHTML = `<tr><td style="text-align:center; color:#eee; font-weight:bold; padding:20px;" colspan="${feeds.length+1}">Loading...</td></tr>`;
 
   feeds = await fetchFeeds();
   setHeaderTitle();
@@ -89,9 +91,14 @@ async function buildCalendar() {
 
   const slots = getTimeSlots(startHour, endHour);
   const tableData = slots.map(() => feeds.map(() => []));
+  const darkBg = "#1e1e1e";
+  const textColor = "#eee";
+  const availableBg = "#2a2a2a";
+  const colWidth = `${Math.floor(100 / (feeds.length + 1))}%`;
+  const rendered = Array.from({length: feeds.length}, () => 0);
 
-  // Fetch events in parallel
-  const feedPromises = feeds.map(async (feed, i) => {
+  // Parse ICS feeds in parallel
+  await Promise.all(feeds.map(async (feed, i) => {
     try {
       const jcalData = ICAL.parse(feed.ics);
       const comp = new ICAL.Component(jcalData);
@@ -99,7 +106,7 @@ async function buildCalendar() {
       events.forEach(ev => {
         const start = toGMT8(ev.startDate);
         const end = toGMT8(ev.endDate);
-        if (start.toDateString() !== new Date().toDateString() && currentDate.toDateString() !== start.toDateString()) return;
+        if (start.toDateString() !== currentDate.toDateString()) return;
         let index = findSlotIndex(start, slots);
         const endIndex = findSlotIndex(end, slots);
         if (index < 0) index = 0;
@@ -108,31 +115,17 @@ async function buildCalendar() {
         }
       });
     } catch(e) {
-      console.error(`Error fetching ICS: ${feed.name}`, e);
+      console.error(`Error parsing feed ${feed.name}:`, e);
       for (let row of tableData) row[i] = [{ summary: "Error" }];
     }
-    renderTablePartial(tableData, slots);
-  });
+  }));
 
-  await Promise.all(feedPromises);
-  renderTablePartial(tableData, slots); // Ensure final render
-}
-
-// Render table incrementally
-function renderTablePartial(tableData, slots) {
-  const darkBg = "#1e1e1e";
-  const textColor = "#eee";
-  const availableBg = "#2a2a2a";
-  const colWidth = `${Math.floor(100 / (feeds.length + 1))}%`;
-  const rendered = Array.from({length: feeds.length}, () => 0);
-
-  let html = `<tr><th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555">Time</th>`;
+  // Build HTML
+  let html = `<tr><th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555; font-weight:bold; font-size:0.9rem; padding:5px;">Time</th>`;
   feeds.forEach(f => {
-    html += `<th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555">${f.name}</th>`;
+    html += `<th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555; font-weight:bold; font-size:0.9rem; padding:5px;">${f.name}</th>`;
   });
   html += "</tr>";
-
-  const now = new Date();
 
   for (let r = 0; r < slots.length; r++) {
     const [slotHour, slotMinute] = slots[r].split(':').map(Number);
@@ -140,7 +133,7 @@ function renderTablePartial(tableData, slots) {
     slotTime.setHours(slotHour, slotMinute, 0, 0);
 
     const timeLabel = slotTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    html += `<tr><td style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555; font-weight:bold;">${timeLabel}</td>`;
+    html += `<tr><td style="width:120px; background-color:${darkBg}; color:${textColor}; border:1px solid #555; font-weight:bold; font-size:0.9rem; padding:5px;">${timeLabel}</td>`;
 
     for (let c = 0; c < feeds.length; c++) {
       if (rendered[c] > 0) { rendered[c]--; continue; }
@@ -168,11 +161,11 @@ function renderTablePartial(tableData, slots) {
         const isCheckout = ev.summary.includes("Checkout");
         let isLate = false;
 
-        if (isReservation) isLate = evStart < now;
-        if (isCheckout) isLate = evEnd < now;
+        if (isReservation) isLate = evStart < new Date();
+        if (isCheckout) isLate = evEnd < new Date();
 
         let label = isReservation ? "Reservation" : isCheckout ? "Checkout" : "Booked";
-        if (isLate) label = `Late ${label}`, color = "#FAA";
+        if (isLate) label = `Late ${label}`, color = "#F99";
 
         if (isReservation) bgColor = "#4a90e2";   // Blue
         if (isCheckout) bgColor = "#4caf50";      // Green
@@ -188,25 +181,22 @@ function renderTablePartial(tableData, slots) {
           nextEventTime.setHours(endHour, 0, 0, 0);
         }
 
-        if (nextEventTime < now) displayText = "";
-        else if (slotTime < now) displayText = `Available until ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+        if (nextEventTime < new Date()) displayText = "";
+        else if (slotTime < new Date()) displayText = `Available until ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
         else displayText = `Available<br>${slotTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
       }
 
-      html += `<td style="background-color:${bgColor}; text-align:center; vertical-align:middle; color:${color}; width:${colWidth}; border:1px solid #555; font-weight:bold;" rowspan="${span}">${displayText}</td>`;
+      html += `<td style="background-color:${bgColor}; text-align:center; vertical-align:middle; color:${color}; max-width:120px; width:${colWidth}; border:1px solid #555; font-weight:bold; font-size:0.9rem; padding:5px;" rowspan="${span}">${displayText}</td>`;
     }
     html += "</tr>";
   }
 
-  const table = document.getElementById("calendarTable");
   table.innerHTML = html;
 }
 
-// Refresh calendar
 function refreshCalendar() {
   buildCalendar().catch(err => console.error(err));
 }
 
-// Initial build and auto-refresh every minute
 buildCalendar();
 setInterval(refreshCalendar, 60000);
