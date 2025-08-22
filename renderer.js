@@ -77,20 +77,32 @@ function findSlotIndex(date, slots) {
   return slots.indexOf(slotStr);
 }
 
+// Immediately render header, buttons, and loading table
+function renderInitialLoading() {
+  setHeaderTitle();
+  addNavButtons();
+
+  let table = document.getElementById("calendarTable");
+  if (!table) {
+    table = document.createElement('table');
+    table.id = "calendarTable";
+    table.style.width = "100%";
+    table.style.borderCollapse = "collapse";
+    table.style.marginBottom = "20px";
+    document.body.appendChild(table);
+  }
+
+  table.innerHTML = `<tr><td colspan="${feeds.length+1}" style="text-align:center; color:#eee; font-weight:bold; padding:20px;">Loading ${currentDate.toLocaleDateString()}</td></tr>`;
+}
+
 // Main calendar builder
 async function buildCalendar() {
   const systemDate = new Date(); // Always use system date for comparisons
   feeds = await fetchFeeds();
-  addNavButtons();
 
   const table = document.getElementById("calendarTable");
   const slots = getTimeSlots(startHour, endHour);
   const tableData = slots.map(() => feeds.map(() => []));
-
-  // Clear table and show "Loading" for immediate feedback
-  if (table) {
-    table.innerHTML = `<tr><td colspan="${feeds.length+1}" style="text-align:center; color:#eee; font-weight:bold; padding:20px;">Loading ${currentDate.toLocaleDateString()}</td></tr>`;
-  }
 
   // Load each feed in parallel, update table as results come in
   await Promise.all(feeds.map(async (feed, i) => {
@@ -196,15 +208,12 @@ function renderTablePartial(tableData, slots, systemDate) {
     html += "</tr>";
   }
 
-  const table = document.getElementById("calendarTable");
   table.innerHTML = html;
 }
 
 // Refresh calendar
 function refreshCalendar() {
-  setHeaderTitle(); // Update header immediately
-  const table = document.getElementById("calendarTable");
-  table.innerHTML = `<tr><td colspan="${feeds.length+1}" style="text-align:center; color:#eee; font-weight:bold; padding:20px;">Loading ${currentDate.toLocaleDateString()}</td></tr>`;
+  renderInitialLoading(); // Show header, buttons, and Loading immediately
   buildCalendar().catch(err => console.error(err));
 }
 
