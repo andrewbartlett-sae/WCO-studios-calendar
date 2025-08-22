@@ -5,8 +5,6 @@ let currentDate = new Date();
 const startHour = 8;
 const endHour = 21;
 
-let pendingControllers = [];
-
 // Fetch feeds from Apps Script
 async function fetchFeeds() {
   const res = await fetch(webAppUrl);
@@ -41,52 +39,20 @@ function addNavButtons() {
     const prevBtn = document.createElement('button');
     prevBtn.textContent = "← Previous Day";
     prevBtn.style.marginRight = "10px";
-    prevBtn.onclick = () => { changeDay(-1); };
+    prevBtn.onclick = () => { currentDate.setDate(currentDate.getDate() - 1); refreshCalendar(); };
     nav.appendChild(prevBtn);
 
     const todayBtn = document.createElement('button');
     todayBtn.textContent = "Today";
     todayBtn.style.marginRight = "10px";
-    todayBtn.onclick = () => {
-        const now = new Date();
-        currentDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        cancelPreviousRequests();
-        clearCalendar();
-        showLoading();
-        setHeaderTitle();
-        buildCalendar();
-    };
+    todayBtn.onclick = () => { currentDate = new Date(); refreshCalendar(); };
     nav.appendChild(todayBtn);
 
     const nextBtn = document.createElement('button');
     nextBtn.textContent = "Next Day →";
-    nextBtn.onclick = () => { changeDay(1); };
+    nextBtn.onclick = () => { currentDate.setDate(currentDate.getDate() + 1); refreshCalendar(); };
     nav.appendChild(nextBtn);
   }
-}
-
-function changeDay(offset) {
-  currentDate.setDate(currentDate.getDate() + offset);
-  cancelPreviousRequests();
-  clearCalendar();
-  showLoading();
-  setHeaderTitle();
-  buildCalendar();
-}
-
-function cancelPreviousRequests() {
-  pendingControllers.forEach(ctrl => ctrl.abort());
-  pendingControllers = [];
-}
-
-function clearCalendar() {
-  const table = document.getElementById("calendarTable");
-  if (table) table.innerHTML = "";
-}
-
-function showLoading() {
-  const table = document.getElementById("calendarTable");
-  table.innerHTML = `<tr><td colspan="${feeds.length + 1}" style="text-align:center; color:#eee; font-weight:bold; background:#1e1e1e; padding:20px;">Loading…</td></tr>`;
 }
 
 function toGMT8(icalTime) {
@@ -111,69 +77,62 @@ function findSlotIndex(date, slots) {
   return slots.indexOf(slotStr);
 }
 
-// Build calendar table
+// Build the calendar table
 async function buildCalendar() {
+  // Clear table and show loading
+  const table = document.getElementById("calendarTable");
+  table.innerHTML = `<tr><td style="color:#eee; text-align:center; padding:20px;" colspan="${feeds.length + 1}">Loading...</td></tr>`;
+
   feeds = await fetchFeeds();
+  setHeaderTitle();
   addNavButtons();
 
-  const table = document.getElementById("calendarTable");
   const slots = getTimeSlots(startHour, endHour);
   const tableData = slots.map(() => feeds.map(() => []));
 
+  // Fetch events in parallel
+  const feedPromises = feeds.map(async (feed, i) => {
+    try {
+      const jcalData = ICAL.parse(feed.ics);
+      const comp = new ICAL.Component(jcalData);
+      const events = comp.getAllSubcomponents("vevent").map(e => new ICAL.Event(e));
+      events.forEach(ev => {
+        const start = toGMT8(ev.startDate);
+        const end = toGMT8(ev.endDate);
+        if (start.toDateString() !== new Date().toDateString() && currentDate.toDateString() !== start.toDateString()) return;
+        let index = findSlotIndex(start, slots);
+        const endIndex = findSlotIndex(end, slots);
+        if (index < 0) index = 0;
+        for (let s = index; s <= endIndex && s < slots.length; s++) {
+          tableData[s][i].push({ summary: ev.summary, start, end });
+        }
+      });
+    } catch(e) {
+      console.error(`Error fetching ICS: ${feed.name}`, e);
+      for (let row of tableData) row[i] = [{ summary: "Error" }];
+    }
+    renderTablePartial(tableData, slots);
+  });
+
+  await Promise.all(feedPromises);
+  renderTablePartial(tableData, slots); // Ensure final render
+}
+
+// Render table incrementally
+function renderTablePartial(tableData, slots) {
   const darkBg = "#1e1e1e";
   const textColor = "#eee";
   const availableBg = "#2a2a2a";
   const colWidth = `${Math.floor(100 / (feeds.length + 1))}%`;
   const rendered = Array.from({length: feeds.length}, () => 0);
 
-  // Initialize table with headers
   let html = `<tr><th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555">Time</th>`;
   feeds.forEach(f => {
     html += `<th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555">${f.name}</th>`;
   });
   html += "</tr>";
-  table.innerHTML = html;
 
-  // Load feeds in parallel
-  feeds.forEach((feed, i) => {
-    const controller = new AbortController();
-    pendingControllers.push(controller);
-
-    (async () => {
-      try {
-        const jcalData = ICAL.parse(feed.ics);
-        const comp = new ICAL.Component(jcalData);
-        const events = comp.getAllSubcomponents("vevent").map(e => new ICAL.Event(e));
-
-        events.forEach(ev => {
-          const start = toGMT8(ev.startDate);
-          const end = toGMT8(ev.endDate);
-          if (start.toDateString() !== currentDate.toDateString()) return;
-          let index = findSlotIndex(start, slots);
-          const endIndex = findSlotIndex(end, slots);
-          if (index < 0) index = 0;
-          for (let s = index; s <= endIndex && s < slots.length; s++) {
-            tableData[s][i].push({ summary: ev.summary, start, end });
-          }
-        });
-
-        renderTablePartial(table, slots, tableData, rendered, darkBg, textColor, availableBg, colWidth);
-      } catch(e) {
-        console.error("Error parsing ICS:", e);
-        for (let row of tableData) row[i] = [{ summary: "Error" }];
-        renderTablePartial(table, slots, tableData, rendered, darkBg, textColor, availableBg, colWidth);
-      }
-    })();
-  });
-}
-
-// Render table partially
-function renderTablePartial(table, slots, tableData, rendered, darkBg, textColor, availableBg, colWidth) {
-  let html = `<tr><th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555">Time</th>`;
-  feeds.forEach(f => {
-    html += `<th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555">${f.name}</th>`;
-  });
-  html += "</tr>";
+  const now = new Date();
 
   for (let r = 0; r < slots.length; r++) {
     const [slotHour, slotMinute] = slots[r].split(':').map(Number);
@@ -209,8 +168,8 @@ function renderTablePartial(table, slots, tableData, rendered, darkBg, textColor
         const isCheckout = ev.summary.includes("Checkout");
         let isLate = false;
 
-        if (isReservation) isLate = evStart < new Date();
-        if (isCheckout) isLate = evEnd < new Date();
+        if (isReservation) isLate = evStart < now;
+        if (isCheckout) isLate = evEnd < now;
 
         let label = isReservation ? "Reservation" : isCheckout ? "Checkout" : "Booked";
         if (isLate) label = `Late ${label}`, color = "#FAA";
@@ -229,32 +188,25 @@ function renderTablePartial(table, slots, tableData, rendered, darkBg, textColor
           nextEventTime.setHours(endHour, 0, 0, 0);
         }
 
-        if (nextEventTime < new Date()) displayText = "";
-        else if (slotTime < new Date()) displayText = `Available until ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+        if (nextEventTime < now) displayText = "";
+        else if (slotTime < now) displayText = `Available until ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
         else displayText = `Available<br>${slotTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
       }
 
       html += `<td style="background-color:${bgColor}; text-align:center; vertical-align:middle; color:${color}; width:${colWidth}; border:1px solid #555; font-weight:bold;" rowspan="${span}">${displayText}</td>`;
     }
-
     html += "</tr>";
   }
 
+  const table = document.getElementById("calendarTable");
   table.innerHTML = html;
 }
 
+// Refresh calendar
 function refreshCalendar() {
-  cancelPreviousRequests();
-  clearCalendar();
-  showLoading();
   buildCalendar().catch(err => console.error(err));
 }
 
-// Initial build
-showLoading();
+// Initial build and auto-refresh every minute
 buildCalendar();
-
-// Auto-refresh every 1 minute
-setInterval(() => {
-  refreshCalendar();
-}, 60000);
+setInterval(refreshCalendar, 60000);
