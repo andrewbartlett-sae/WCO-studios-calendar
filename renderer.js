@@ -169,7 +169,7 @@ async function buildCalendar() {
         let label = isReservation ? "Reservation" : isCheckout ? "Checkout" : "Booked";
         if (isLate) {
             label = label + " - LATE";
-            color = "red";
+            color = "#F99";
         }
 
         if (isReservation) bgColor = "#4a90e2"; // Blue
