@@ -5,15 +5,23 @@ let currentDate = new Date();
 const startHour = 8;
 const endHour = 21;
 
-// Fetch feeds from Apps Script
+// Track ongoing fetches
+let currentAbortController = null;
+
 async function fetchFeeds() {
-  const res = await fetch(webAppUrl);
+  // Abort previous request if exists
+  if (currentAbortController) {
+    currentAbortController.abort();
+  }
+  currentAbortController = new AbortController();
+  const signal = currentAbortController.signal;
+
+  const res = await fetch(webAppUrl, { signal });
   if (!res.ok) throw new Error(`Failed to fetch feeds: ${res.status}`);
   const data = await res.json();
   return data;
 }
 
-// Header
 function setHeaderTitle() {
   let header = document.getElementById("calendarHeader");
   if (!header) {
@@ -28,7 +36,6 @@ function setHeaderTitle() {
   header.textContent = `Studio Availability – ${currentDate.toLocaleDateString('en-GB', options)}`;
 }
 
-// Navigation buttons
 function addNavButtons() {
   let nav = document.getElementById("calendarNav");
   if (!nav) {
@@ -41,30 +48,35 @@ function addNavButtons() {
     const prevBtn = document.createElement('button');
     prevBtn.textContent = "← Previous Day";
     prevBtn.style.marginRight = "10px";
-    prevBtn.onclick = () => {
-      currentDate.setDate(currentDate.getDate() - 1);
-      refreshCalendarImmediate();
-    };
+    prevBtn.onclick = () => { changeDay(-1); };
     nav.appendChild(prevBtn);
 
     const nextBtn = document.createElement('button');
     nextBtn.textContent = "Next Day →";
-    nextBtn.onclick = () => {
-      currentDate.setDate(currentDate.getDate() + 1);
-      refreshCalendarImmediate();
-    };
+    nextBtn.onclick = () => { changeDay(1); };
     nav.appendChild(nextBtn);
   }
 }
 
-// Convert ICAL to GMT+8
+// Change the date and immediately clear table
+function changeDay(delta) {
+  currentDate.setDate(currentDate.getDate() + delta);
+  clearCalendar();
+  setHeaderTitle();
+  refreshCalendar();
+}
+
+function clearCalendar() {
+  const table = document.getElementById("calendarTable");
+  table.innerHTML = `<tr><td colspan="${feeds.length + 1}" style="color:#eee; text-align:center; padding:20px; font-weight:bold;">Loading...</td></tr>`;
+}
+
 function toGMT8(icalTime) {
   const d = icalTime.toJSDate();
   const utcTime = d.getTime() + d.getTimezoneOffset() * 60000;
   return new Date(utcTime + 8 * 60 * 60 * 1000);
 }
 
-// Time slots
 function getTimeSlots(startHour, endHour) {
   const slots = [];
   for (let h = startHour; h <= endHour; h++) {
@@ -81,46 +93,19 @@ function findSlotIndex(date, slots) {
   return slots.indexOf(slotStr);
 }
 
-// Immediately clear table and show loading
-function renderEmptyTable() {
-  const table = document.getElementById("calendarTable");
-  const slots = getTimeSlots(startHour, endHour);
-  const darkBg = "#1e1e1e";
-  const textColor = "#eee";
-  const colWidth = "10%";
-
-  let html = `<tr><th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555">Time</th>`;
-  for (let i = 0; i < 10; i++) {
-    html += `<th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555">Loading...</th>`;
-  }
-  html += "</tr>";
-
-  slots.forEach(slot => {
-    html += `<tr><td style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555; font-weight:bold;">${slot}</td>`;
-    for (let i = 0; i < 10; i++) {
-      html += `<td style="background-color:#2a2a2a; text-align:center; vertical-align:middle; color:${textColor}; width:${colWidth}; border:1px solid #555; font-weight:bold;">...</td>`;
-    }
-    html += "</tr>";
-  });
-
-  table.innerHTML = html;
-}
-
-// Async build calendar
-async function fetchAndBuildCalendar() {
+async function buildCalendar() {
   try {
     feeds = await fetchFeeds();
-    await buildCalendar();
-  } catch(err) {
-    console.error(err);
-    const table = document.getElementById("calendarTable");
-    table.innerHTML = `<tr><td colspan="11" style="color:red; text-align:center;">Failed to load calendar</td></tr>`;
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      console.log("Previous fetch aborted.");
+      return; // Don't render if aborted
+    } else {
+      console.error(err);
+      return;
+    }
   }
-}
 
-// Main calendar builder
-async function buildCalendar() {
-  setHeaderTitle();
   const table = document.getElementById("calendarTable");
   const slots = getTimeSlots(startHour, endHour);
   const tableData = slots.map(() => feeds.map(() => []));
@@ -222,25 +207,20 @@ async function buildCalendar() {
 
       html += `<td style="background-color:${bgColor}; text-align:center; vertical-align:middle; color:${color}; width:${colWidth}; border:1px solid #555; font-weight:bold;" rowspan="${span}">${displayText}</td>`;
     }
-
     html += "</tr>";
   }
 
   table.innerHTML = html;
 }
 
-// Immediate refresh on button click
-function refreshCalendarImmediate() {
-  setHeaderTitle();   // update header immediately
-  renderEmptyTable(); // clear table instantly
-  fetchAndBuildCalendar(); // async load ICS
+function refreshCalendar() {
+  clearCalendar();
+  buildCalendar().catch(err => console.error(err));
 }
 
-// Initial load
 addNavButtons();
-refreshCalendarImmediate();
+clearCalendar();
+refreshCalendar();
 
-// Auto refresh every minute
-setInterval(() => {
-  refreshCalendarImmediate();
-}, 60000);
+// Auto-refresh every 1 min
+setInterval(refreshCalendar, 60000);
