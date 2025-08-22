@@ -13,7 +13,9 @@ async function fetchFeeds() {
   return data;
 }
 
-function setHeaderTitle() {
+// Render header and navigation buttons immediately
+function renderHeaderAndNav() {
+  // Header
   let header = document.getElementById("calendarHeader");
   if (!header) {
     header = document.createElement('h1');
@@ -21,20 +23,20 @@ function setHeaderTitle() {
     header.style.color = "#eee";
     header.style.textAlign = "center";
     header.style.marginBottom = "20px";
+    header.style.fontSize = "1.5em";
     document.body.prepend(header);
   }
-  const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-  header.textContent = `Studio Availability – ${currentDate.toLocaleDateString('en-GB', options)}`;
-}
+  header.textContent = `Studio Availability – ${currentDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`;
 
-function addNavButtons() {
+  // Navigation
   let nav = document.getElementById("calendarNav");
   if (!nav) {
     nav = document.createElement('div');
     nav.id = "calendarNav";
     nav.style.textAlign = "center";
     nav.style.marginBottom = "10px";
-    document.body.prepend(nav);
+    nav.style.marginTop = "10px";
+    document.body.insertBefore(nav, document.getElementById("calendarTable"));
 
     const prevBtn = document.createElement('button');
     prevBtn.textContent = "← Previous Day";
@@ -55,12 +57,28 @@ function addNavButtons() {
   }
 }
 
+// Render the table with a loading message
+function renderLoadingTable() {
+  let table = document.getElementById("calendarTable");
+  if (!table) {
+    table = document.createElement('table');
+    table.id = "calendarTable";
+    table.style.width = "100%";
+    table.style.borderCollapse = "collapse";
+    table.style.marginBottom = "20px";
+    document.body.appendChild(table);
+  }
+  table.innerHTML = `<tr><td colspan="11" style="text-align:center; color:#eee; font-weight:bold; padding:20px;">Loading ${currentDate.toLocaleDateString()}</td></tr>`;
+}
+
+// Convert ICAL time to GMT+8
 function toGMT8(icalTime) {
   const d = icalTime.toJSDate();
   const utcTime = d.getTime() + d.getTimezoneOffset() * 60000;
   return new Date(utcTime + 8 * 60 * 60 * 1000);
 }
 
+// Generate half-hour slots
 function getTimeSlots(startHour, endHour) {
   const slots = [];
   for (let h = startHour; h <= endHour; h++) {
@@ -77,43 +95,26 @@ function findSlotIndex(date, slots) {
   return slots.indexOf(slotStr);
 }
 
-// Immediately render header, buttons, and loading table
-function renderInitialLoading() {
-  setHeaderTitle();
-  addNavButtons();
-
-  let table = document.getElementById("calendarTable");
-  if (!table) {
-    table = document.createElement('table');
-    table.id = "calendarTable";
-    table.style.width = "100%";
-    table.style.borderCollapse = "collapse";
-    table.style.marginBottom = "20px";
-    document.body.appendChild(table);
-  }
-
-  table.innerHTML = `<tr><td colspan="${feeds.length+1}" style="text-align:center; color:#eee; font-weight:bold; padding:20px;">Loading ${currentDate.toLocaleDateString()}</td></tr>`;
-}
-
-// Main calendar builder
+// Render the full table from ICS data
 async function buildCalendar() {
-  const systemDate = new Date(); // Always use system date for comparisons
+  renderHeaderAndNav();
+  renderLoadingTable();
   feeds = await fetchFeeds();
 
   const table = document.getElementById("calendarTable");
   const slots = getTimeSlots(startHour, endHour);
   const tableData = slots.map(() => feeds.map(() => []));
 
-  // Load each feed in parallel, update table as results come in
-  await Promise.all(feeds.map(async (feed, i) => {
+  // Parse ICS events
+  for (let i = 0; i < feeds.length; i++) {
     try {
-      const jcalData = ICAL.parse(feed.ics);
+      const jcalData = ICAL.parse(feeds[i].ics);
       const comp = new ICAL.Component(jcalData);
       const events = comp.getAllSubcomponents("vevent").map(e => new ICAL.Event(e));
       events.forEach(ev => {
         const start = toGMT8(ev.startDate);
         const end = toGMT8(ev.endDate);
-        if (start.toDateString() !== currentDate.toDateString()) return;
+        if (start.toDateString() !== new Date().toDateString() && start.toDateString() !== currentDate.toDateString()) return;
         let index = findSlotIndex(start, slots);
         const endIndex = findSlotIndex(end, slots);
         if (index < 0) index = 0;
@@ -121,26 +122,22 @@ async function buildCalendar() {
           tableData[s][i].push({ summary: ev.summary, start, end });
         }
       });
-      renderTablePartial(tableData, slots, systemDate);
     } catch(e) {
-      console.error(`Error fetching ICS for ${feed.name}:`, e);
+      console.error(e);
       for (let row of tableData) row[i] = [{ summary: "Error" }];
-      renderTablePartial(tableData, slots, systemDate);
     }
-  }));
-}
+  }
 
-// Partial table renderer so table updates as feeds load
-function renderTablePartial(tableData, slots, systemDate) {
+  // Render table
   const darkBg = "#1e1e1e";
   const textColor = "#eee";
   const availableBg = "#2a2a2a";
   const colWidth = `${Math.floor(100 / (feeds.length + 1))}%`;
   const rendered = Array.from({length: feeds.length}, () => 0);
 
-  let html = `<tr><th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555">Time</th>`;
+  let html = `<tr><th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555; font-weight:bold;">Time</th>`;
   feeds.forEach(f => {
-    html += `<th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555">${f.name}</th>`;
+    html += `<th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555; font-weight:bold;">${f.name}</th>`;
   });
   html += "</tr>";
 
@@ -178,14 +175,14 @@ function renderTablePartial(tableData, slots, systemDate) {
         const isCheckout = ev.summary.includes("Checkout");
         let isLate = false;
 
-        if (isReservation) isLate = evStart < systemDate;
-        if (isCheckout) isLate = evEnd < systemDate;
+        if (isReservation) isLate = evStart < new Date();
+        if (isCheckout) isLate = evEnd < new Date();
 
         let label = isReservation ? "Reservation" : isCheckout ? "Checkout" : "Booked";
         if (isLate) label = `Late ${label}`, color = "#FAA";
 
-        if (isReservation) bgColor = "#4a90e2";
-        if (isCheckout) bgColor = "#4caf50";
+        if (isReservation) bgColor = "#4a90e2";   // Blue
+        if (isCheckout) bgColor = "#4caf50";      // Green
 
         displayText = `${label}<br>${evStart.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${evEnd.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
       } else {
@@ -198,8 +195,8 @@ function renderTablePartial(tableData, slots, systemDate) {
           nextEventTime.setHours(endHour, 0, 0, 0);
         }
 
-        if (nextEventTime < systemDate) displayText = "";
-        else if (slotTime < systemDate) displayText = `Available until ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+        if (nextEventTime < new Date()) displayText = "";
+        else if (slotTime < new Date()) displayText = `Available until ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
         else displayText = `Available<br>${slotTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
       }
 
@@ -213,14 +210,17 @@ function renderTablePartial(tableData, slots, systemDate) {
 
 // Refresh calendar
 function refreshCalendar() {
-  renderInitialLoading(); // Show header, buttons, and Loading immediately
   buildCalendar().catch(err => console.error(err));
 }
 
-// Initial load
+// Initial render of header/nav/loading table
+renderHeaderAndNav();
+renderLoadingTable();
+
+// First calendar load
 refreshCalendar();
 
-// Auto-refresh every minute
+// Auto-refresh every 1 minute
 setInterval(() => {
   refreshCalendar();
 }, 60000);
