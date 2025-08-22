@@ -1,95 +1,109 @@
+:root {
+  --bg: #000;
+  --panel: #1e1e1e;
+  --text: #eee;
+  --muted: #888;
+  --border: #555;
+  --available: #2a2a2a;
+  --reservation: #4a90e2;
+  --checkout: #4caf50;
+  --booked: #444;
+  --late-text: #FAA;
+}
+
+/* General Layout */
 body {
-  background-color: #1e1e1e;
-  color: #eee;
-  font-family: Arial, sans-serif;
   margin: 0;
-  padding: 10px;
-  text-align: center;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+    "Noto Sans", "Liberation Sans", sans-serif;
+  color: var(--text);
+  background-color: var(--bg);
 }
 
 #calendarHeader {
-  margin-bottom: 5px;
+  text-align: center;
+  margin: 10px 0 5px;
 }
 
 #calendarVersion {
-  color: #888;
+  color: var(--muted);
   font-size: 10px;
-  margin-bottom: 20px;
+  text-align: center;
+  margin: 0 0 20px;
 }
 
 #calendarNav {
-  margin-bottom: 10px;
+  text-align: center;
+  margin: 10px 0;
 }
 
 #calendarNav button {
-  margin: 0 5px;
-  padding: 5px 10px;
-  border: none;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
   border-radius: 4px;
-  background-color: #444;
-  color: #eee;
-  font-weight: bold;
+  padding: 6px 10px;
+  margin-right: 10px;
   cursor: pointer;
 }
-
+#calendarNav button:last-child {
+  margin-right: 0;
+}
 #calendarNav button:hover {
-  background-color: #666;
+  filter: brightness(1.1);
 }
 
+/* Table */
 #calendarTable {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 10px;
+  table-layout: fixed;
 }
 
 #calendarTable th,
 #calendarTable td {
-  border: 1px solid #555;
-  padding: 8px;
+  border: 1px solid var(--border);
   text-align: center;
   vertical-align: middle;
   font-weight: bold;
+  font-family: inherit;
 }
 
-.time-col {
-  background-color: #1e1e1e;
+#calendarTable th {
+  background-color: var(--panel);
 }
 
-.feed-col {
-  background-color: #1e1e1e;
+#calendarTable td.timeCell {
+  background-color: var(--panel);
 }
 
-.time-cell {
-  background-color: #1e1e1e;
+/* Availability states */
+#calendarTable td.cell.available {
+  background-color: var(--available);
 }
 
-.cell.available {
-  background-color: #2a2a2a;
-  color: #eee;
+#calendarTable td.cell.reservation {
+  background-color: var(--reservation);
+  color: #fff; /* ensure legible */
 }
 
-.cell.reservation {
-  background-color: #4a90e2;
+#calendarTable td.cell.checkout {
+  background-color: var(--checkout);
   color: #fff;
 }
 
-.cell.checkout {
-  background-color: #4caf50;
-  color: #fff;
+#calendarTable td.cell.booked {
+  background-color: var(--booked);
+  color: var(--text);
 }
 
-.cell.booked {
-  background-color: #888;
-  color: #fff;
+#calendarTable td.cell.late {
+  color: var(--late-text);
 }
 
-.cell.late {
-  background-color: #800;
-  color: #faa;
-}
-
-.loading-cell {
-  color: #eee;
+/* Loading cell */
+#calendarTable td.loading {
+  color: var(--text);
   text-align: center;
   padding: 20px;
   font-weight: bold;
