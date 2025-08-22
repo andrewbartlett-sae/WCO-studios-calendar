@@ -9,10 +9,7 @@ const endHour = 21;
 let currentAbortController = null;
 
 async function fetchFeeds() {
-  // Abort previous request if exists
-  if (currentAbortController) {
-    currentAbortController.abort();
-  }
+  if (currentAbortController) currentAbortController.abort();
   currentAbortController = new AbortController();
   const signal = currentAbortController.signal;
 
@@ -51,6 +48,17 @@ function addNavButtons() {
     prevBtn.onclick = () => { changeDay(-1); };
     nav.appendChild(prevBtn);
 
+    const todayBtn = document.createElement('button');
+    todayBtn.textContent = "Today";
+    todayBtn.style.marginRight = "10px";
+    todayBtn.onclick = () => {
+      currentDate = new Date(); // always system "today"
+      clearCalendar();
+      setHeaderTitle();
+      refreshCalendar();
+    };
+    nav.appendChild(todayBtn);
+
     const nextBtn = document.createElement('button');
     nextBtn.textContent = "Next Day →";
     nextBtn.onclick = () => { changeDay(1); };
@@ -58,7 +66,6 @@ function addNavButtons() {
   }
 }
 
-// Change the date and immediately clear table
 function changeDay(delta) {
   currentDate.setDate(currentDate.getDate() + delta);
   clearCalendar();
@@ -99,7 +106,7 @@ async function buildCalendar() {
   } catch (err) {
     if (err.name === 'AbortError') {
       console.log("Previous fetch aborted.");
-      return; // Don't render if aborted
+      return;
     } else {
       console.error(err);
       return;
@@ -110,7 +117,6 @@ async function buildCalendar() {
   const slots = getTimeSlots(startHour, endHour);
   const tableData = slots.map(() => feeds.map(() => []));
 
-  // Parse ICS events
   for (let i = 0; i < feeds.length; i++) {
     try {
       const jcalData = ICAL.parse(feeds[i].ics);
@@ -133,7 +139,6 @@ async function buildCalendar() {
     }
   }
 
-  // Render table
   const darkBg = "#1e1e1e";
   const textColor = "#eee";
   const availableBg = "#2a2a2a";
@@ -186,8 +191,8 @@ async function buildCalendar() {
         let label = isReservation ? "Reservation" : isCheckout ? "Checkout" : "Booked";
         if (isLate) label = `Late ${label}`, color = "#FAA";
 
-        if (isReservation) bgColor = "#4a90e2";   // Blue
-        if (isCheckout) bgColor = "#4caf50";      // Green
+        if (isReservation) bgColor = "#4a90e2";
+        if (isCheckout) bgColor = "#4caf50";
 
         displayText = `${label}<br>${evStart.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${evEnd.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
       } else {
@@ -215,12 +220,13 @@ async function buildCalendar() {
 
 function refreshCalendar() {
   clearCalendar();
+  setHeaderTitle();
   buildCalendar().catch(err => console.error(err));
 }
 
 addNavButtons();
 clearCalendar();
+setHeaderTitle();
 refreshCalendar();
 
-// Auto-refresh every 1 min
 setInterval(refreshCalendar, 60000);
