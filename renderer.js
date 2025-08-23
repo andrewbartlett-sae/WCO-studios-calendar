@@ -5,7 +5,7 @@ let feeds = [];
 let currentDate = new Date();
 const startHour = 8;
 const endHour = 21;
-const version = "v1.3";
+const version = "v1.1";
 
 async function fetchFeeds() {
   const res = await fetch(webAppUrlAllCalendars);
@@ -17,10 +17,10 @@ async function fetchFeedsWithProgress() {
   const progressBar = document.getElementById("progressBar");
   const progressText = document.getElementById("progressText");
 
-  // 1. Fetch the feed index
+  // 1. Fetch the feed index (names or IDs)
   let feedIndex;
   try {
-    const res = await fetch(webAppUrl); // main endpoint returns feed metadata
+    const res = await fetch(webAppUrl); // main endpoint returns feed index
     if (!res.ok) throw new Error(`Failed to fetch feed index: ${res.status}`);
     feedIndex = await res.json(); // array of feed metadata
   } catch (err) {
@@ -28,37 +28,37 @@ async function fetchFeedsWithProgress() {
     return [];
   }
 
-  // 2. Construct URLs for each feed
-  const feedUrls = feedIndex.map((feed, i) => {
-    if (feed.id !== undefined) return `${webAppUrl}?feedIndex=${feed.id}`;
-    if (feed.name) return `${webAppUrl}?feedName=${encodeURIComponent(feed.name)}`;
-    console.error("Cannot construct URL for feed:", feed);
-    return null;
-  });
+  const totalFeeds = feedIndex.length;
+  const feedsData = [];
 
-  const totalFeeds = feedUrls.length;
-  let completedFeeds = 0;
-
-  // 3. Fetch all feeds in parallel
-  const fetchPromises = feedUrls.map(async (url, i) => {
-    if (!url) return { name: feedIndex[i].name || `Feed ${i}`, ics: "" };
+  // 2. Fetch each feed one by one, updating progress
+  for (let i = 0; i < totalFeeds; i++) {
+    let feedUrl;
+    // Construct individual feed URL (depends on how Apps Script expects it)
+    if (feedIndex[i].id !== undefined) {
+      feedUrl = `${webAppUrl}?feedIndex=${feedIndex[i].id}`;
+    } else if (feedIndex[i].name) {
+      feedUrl = `${webAppUrl}?feedName=${encodeURIComponent(feedIndex[i].name)}`;
+    } else {
+      console.error("Cannot construct URL for feed:", feedIndex[i]);
+      continue;
+    }
 
     try {
-      const res = await fetch(url);
+      const res = await fetch(feedUrl);
       if (!res.ok) throw new Error(`Failed to fetch ${feedIndex[i].name || i}: ${res.status}`);
       const feedData = await res.json();
-      return feedData;
+      feedsData.push(feedData);
     } catch (err) {
-      console.error("Error fetching feed:", url, err);
-      return { name: feedIndex[i].name || `Feed ${i}`, ics: "" };
-    } finally {
-      completedFeeds++;
-      if (progressBar) progressBar.value = (completedFeeds / totalFeeds) * 100;
-      if (progressText) progressText.textContent = `Loading feed ${completedFeeds} of ${totalFeeds}`;
+      console.error("Error fetching feed:", feedUrl, err);
+      feedsData.push({ name: feedIndex[i].name || `Feed ${i}`, ics: "" });
     }
-  });
 
-  const feedsData = await Promise.all(fetchPromises);
+    // Update progress bar
+    if (progressBar) progressBar.value = ((i + 1) / totalFeeds) * 100;
+    if (progressText) progressText.textContent = `Loading feed ${i + 1} of ${totalFeeds}`;
+  }
+
   return feedsData;
 }
 
