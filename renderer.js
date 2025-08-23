@@ -1,59 +1,125 @@
-const webAppUrl = "https://script.google.com/a/macros/sae.edu.au/s/AKfycbyMHnsDas6I5BgijywmpdufRa6AfTRsCGTkXZ_eC_pXKN9pEh-aVOvw2BAibSmJjU2I_w/exec";
+const webAppUrlAllCalendars = "https://script.google.com/a/macros/sae.edu.au/s/AKfycbyMHnsDas6I5BgijywmpdufRa6AfTRsCGTkXZ_eC_pXKN9pEh-aVOvw2BAibSmJjU2I_w/exec";
+const webAppUrl = "https://script.google.com/macros/s/AKfycbwdz5SJ3m7fHq_7U6nG8P7yH9TLHCM9fJ8F14SRFIx8pWVsom6P8NOIdhwOY0-MedSN/exec";
 
 let feeds = [];
 let currentDate = new Date();
 const startHour = 8;
 const endHour = 21;
-const version = "v1.1"; // Version number bumped since logic changed
+const version = "v1.0";
 
 async function fetchFeeds() {
-  const res = await fetch(webAppUrl);
+  const res = await fetch(webAppUrlAllCalendars);
   if (!res.ok) throw new Error(`Failed to fetch feeds: ${res.status}`);
   return await res.json();
+}
+
+async function fetchFeedsWithProgress() {
+  const progress = document.getElementById("progressBar");
+  progress.style.width = "0%";
+
+  // Step 1: Get feed list (names + count)
+  const metaRes = await fetch(webAppUrl);
+  if (!metaRes.ok) throw new Error("Failed to fetch feed list");
+  const feedList = await metaRes.json();
+
+  const feedsData = [];
+  for (let i = 0; i < feedList.length; i++) {
+    const res = await fetch(`${webAppUrl}?feed=${i}`);
+    const data = await res.json();
+    feedsData.push(data);
+
+    // update progress
+    progress.style.width = ((i + 1) / feedList.length) * 100 + "%";
+  }
+
+  return feedsData;
+}
+
+async function fetchFeedsParallelWithProgress() {
+  const progress = document.getElementById("progressBar");
+  const progressContainer = document.getElementById("progressContainer");
+  progressContainer.style.display = "block";
+  progress.style.width = "0%";
+
+  // Step 1: Get feed index (first step in progress)
+  const indexRes = await fetch(webAppUrl);
+  if (!indexRes.ok) throw new Error("Failed to fetch feed index");
+  const feedIndex = await indexRes.json(); // [{name:"Studio A"}, ...]
+
+  // Update progress for step 1
+  const totalSteps = feedIndex.length + 1; // +1 for the index fetch itself
+  let completed = 1; // index fetched
+  progress.style.width = ((completed / totalSteps) * 100) + "%";
+
+  // Step 2: Construct URLs for each feed
+  const feedUrls = feedIndex.map((feed, i) => `${webAppUrl}?feed=${i}`);
+
+  // Step 3: Fetch feeds in parallel
+  const feedsData = new Array(feedUrls.length);
+  const fetchPromises = feedUrls.map((url, i) =>
+    fetch(url)
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to fetch feed ${i}`);
+        return res.json();
+      })
+      .then((data) => {
+        feedsData[i] = data;
+      })
+      .catch((err) => {
+        console.error(`Error fetching feed ${i}:`, err);
+        feedsData[i] = { name: feedIndex[i].name, ics: "" }; // fallback
+      })
+      .finally(() => {
+        completed++;
+        progress.style.width = ((completed / totalSteps) * 100) + "%";
+      })
+  );
+
+  await Promise.all(fetchPromises);
+  progressContainer.style.display = "none";
+  return feedsData;
 }
 
 function setHeaderTitle() {
   let header = document.getElementById("calendarHeader");
   if (!header) {
-    header = document.createElement('h1');
+    header = document.createElement("h1");
     header.id = "calendarHeader";
-    header.style.color = "#eee";
-    header.style.textAlign = "center";
-    header.style.marginBottom = "5px";
     document.body.prepend(header);
 
-    // Version number (small, subtle)
     const versionTag = document.createElement("div");
     versionTag.id = "calendarVersion";
     versionTag.textContent = version;
-    versionTag.style.color = "#888";
-    versionTag.style.fontSize = "10px";
-    versionTag.style.textAlign = "center";
-    versionTag.style.marginBottom = "20px";
     document.body.insertBefore(versionTag, header.nextSibling);
   }
-  const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-  header.textContent = `Studio Availability â€“ ${currentDate.toLocaleDateString('en-GB', options)}`;
+  const options = {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  };
+  header.textContent = `Studio Availability – ${currentDate.toLocaleDateString(
+    "en-GB",
+    options
+  )}`;
 }
 
 function addNavButtons() {
   let nav = document.getElementById("calendarNav");
   if (!nav) {
-    nav = document.createElement('div');
+    nav = document.createElement("div");
     nav.id = "calendarNav";
-    nav.style.textAlign = "center";
-    nav.style.marginBottom = "10px";
     document.body.prepend(nav);
 
-    const prevBtn = document.createElement('button');
-    prevBtn.textContent = "â† Previous Day";
-    prevBtn.style.marginRight = "10px";
-    prevBtn.onclick = () => { changeDay(-1); };
+    const prevBtn = document.createElement("button");
+    prevBtn.textContent = "← Previous Day";
+    prevBtn.onclick = () => {
+      changeDay(-1);
+    };
     nav.appendChild(prevBtn);
 
-    const todayBtn = document.createElement('button');
+    const todayBtn = document.createElement("button");
     todayBtn.textContent = "Today";
-    todayBtn.style.marginRight = "10px";
     todayBtn.onclick = () => {
       currentDate = new Date(); // Always system date
       clearCalendar();
@@ -62,9 +128,24 @@ function addNavButtons() {
     };
     nav.appendChild(todayBtn);
 
-    const nextBtn = document.createElement('button');
-    nextBtn.textContent = "Next Day â†’";
-    nextBtn.onclick = () => { changeDay(1); };
+    const refreshBts = document.createElement("button");
+    refreshBts.textContent = "Refresh";
+    refreshBts.onclick = async () => {
+      clearCalendar();
+      try {
+        feeds = await fetchFeedsParallelWithProgress();  // refetch from Google Apps Script
+        refreshCalendar();           // rebuild table with fresh data
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    nav.appendChild(refreshBts);
+
+    const nextBtn = document.createElement("button");
+    nextBtn.textContent = "Next Day →";
+    nextBtn.onclick = () => {
+      changeDay(1);
+    };
     nav.appendChild(nextBtn);
   }
 }
@@ -78,7 +159,9 @@ function changeDay(delta) {
 
 function clearCalendar() {
   const table = document.getElementById("calendarTable");
-  table.innerHTML = `<tr><td colspan="${feeds.length + 1}" style="color:#eee; text-align:center; padding:20px; font-weight:bold;">Loading...</td></tr>`;
+  table.innerHTML = `<tr><td class="loading" colspan="${
+    feeds.length + 1
+  }">Loading...</td></tr>`;
 }
 
 function toGMT8(icalTime) {
@@ -90,8 +173,8 @@ function toGMT8(icalTime) {
 function getTimeSlots(startHour, endHour) {
   const slots = [];
   for (let h = startHour; h <= endHour; h++) {
-    slots.push(`${String(h).padStart(2,'0')}:00`);
-    if (h < endHour) slots.push(`${String(h).padStart(2,'0')}:30`);
+    slots.push(`${String(h).padStart(2, "0")}:00`);
+    if (h < endHour) slots.push(`${String(h).padStart(2, "0")}:30`);
   }
   return slots;
 }
@@ -99,7 +182,7 @@ function getTimeSlots(startHour, endHour) {
 function findSlotIndex(date, slots) {
   const h = date.getHours();
   const m = date.getMinutes();
-  const slotStr = `${String(h).padStart(2,'0')}:${m < 30 ? '00' : '30'}`;
+  const slotStr = `${String(h).padStart(2, "0")}:${m < 30 ? "00" : "30"}`;
   return slots.indexOf(slotStr);
 }
 
@@ -108,12 +191,15 @@ async function buildCalendar() {
   const slots = getTimeSlots(startHour, endHour);
   const tableData = slots.map(() => feeds.map(() => []));
 
+  // -- Parse events --
   for (let i = 0; i < feeds.length; i++) {
     try {
       const jcalData = ICAL.parse(feeds[i].ics);
       const comp = new ICAL.Component(jcalData);
-      const events = comp.getAllSubcomponents("vevent").map(e => new ICAL.Event(e));
-      events.forEach(ev => {
+      const events = comp
+        .getAllSubcomponents("vevent")
+        .map((e) => new ICAL.Event(e));
+      events.forEach((ev) => {
         const start = toGMT8(ev.startDate);
         const end = toGMT8(ev.endDate);
         if (start.toDateString() !== currentDate.toDateString()) return;
@@ -124,84 +210,129 @@ async function buildCalendar() {
           tableData[s][i].push({ summary: ev.summary, start, end });
         }
       });
-    } catch(e) {
+    } catch (e) {
       console.error(e);
       for (let row of tableData) row[i] = [{ summary: "Error" }];
     }
   }
 
-  const darkBg = "#1e1e1e";
-  const textColor = "#eee";
-  const availableBg = "#2a2a2a";
-  const colWidth = `${Math.floor(100 / (feeds.length + 1))}%`;
-  const rendered = Array.from({length: feeds.length}, () => 0);
-
-  let html = `<tr><th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555">Time</th>`;
-  feeds.forEach(f => {
-    html += `<th style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555">${f.name}</th>`;
+  // -- Build HTML --
+  let html = `<tr><th>Time</th>`;
+  feeds.forEach((f) => {
+    html += `<th>${f.name}</th>`;
   });
   html += "</tr>";
 
+  const rendered = Array.from({ length: feeds.length }, () => 0);
+
   for (let r = 0; r < slots.length; r++) {
-    const [slotHour, slotMinute] = slots[r].split(':').map(Number);
+    const [slotHour, slotMinute] = slots[r].split(":").map(Number);
     const slotTime = new Date(currentDate);
     slotTime.setHours(slotHour, slotMinute, 0, 0);
 
-    const timeLabel = slotTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    html += `<tr><td style="width:${colWidth}; background-color:${darkBg}; color:${textColor}; border:1px solid #555; font-weight:bold;">${timeLabel}</td>`;
+    const timeLabel = slotTime.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    html += `<tr><td class="timeCell">${timeLabel}</td>`;
 
     for (let c = 0; c < feeds.length; c++) {
-      if (rendered[c] > 0) { rendered[c]--; continue; }
+      if (rendered[c] > 0) {
+        rendered[c]--;
+        continue;
+      }
 
       const cellEvents = tableData[r][c];
       let displayText = "";
       let span = 1;
 
+      // merge identical rows
       for (let k = r + 1; k < slots.length; k++) {
         const nextEvents = tableData[k][c];
-        const nextContent = nextEvents.length ? nextEvents[0].summary : "Available";
-        if ((cellEvents.length ? cellEvents[0].summary : "Available") !== nextContent) break;
+        const nextContent = nextEvents.length
+          ? nextEvents[0].summary
+          : "Available";
+        if (
+          (cellEvents.length ? cellEvents[0].summary : "Available") !==
+          nextContent
+        )
+          break;
         span++;
       }
       rendered[c] = span - 1;
 
-      let bgColor = availableBg;
-      let color = textColor;
+      const classes = ["cell"];
 
       if (cellEvents.length) {
         const ev = cellEvents[0];
         const evStart = ev.start;
         const evEnd = ev.end;
+
         const isReservation = ev.summary.includes("Reservation");
         const isCheckout = ev.summary.includes("Checkout");
         let isLate = false;
 
-        if (isReservation) isLate = evStart < new Date(Date.now() - 30 * 60 * 1000);
+        if (isReservation)
+          isLate = evStart < new Date(Date.now() - 30 * 60 * 1000);
         if (isCheckout) isLate = evEnd < new Date();
 
-        let label = isReservation ? "Reservation" : isCheckout ? "Checkout" : "Booked";
-        if (isLate) label = `Late ${label}`, color = "#FAA";
+        let label = isReservation
+          ? "Reservation"
+          : isCheckout
+          ? "Checkout"
+          : "Booked";
 
-        if (isReservation) bgColor = "#4a90e2";
-        if (isCheckout) bgColor = "#4caf50";
+        if (isReservation) classes.push("reservation");
+        else if (isCheckout) classes.push("checkout");
+        else classes.push("booked");
 
-        displayText = `${label}<br>${evStart.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${evEnd.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+        if (isLate) {
+          classes.push("late");
+          label = "Late " + label;
+        }
+
+        displayText = `${label}<br>${evStart.toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+        })} - ${evEnd.toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+        })}`;
       } else {
+        classes.push("available");
+
+        // find next event
         let nextEventTime = null;
         for (let k = r + 1; k < slots.length; k++) {
-          if (tableData[k][c].length) { nextEventTime = tableData[k][c][0].start; break; }
+          if (tableData[k][c].length) {
+            nextEventTime = tableData[k][c][0].start;
+            break;
+          }
         }
         if (!nextEventTime) {
           nextEventTime = new Date(currentDate);
           nextEventTime.setHours(endHour, 0, 0, 0);
         }
 
-        if (nextEventTime < new Date()) displayText = "";
-        else if (slotTime < new Date()) displayText = `Available until ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
-        else displayText = `Available<br>${slotTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${nextEventTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+        if (nextEventTime < new Date()) {
+          displayText = "";
+        } else if (slotTime < new Date()) {
+          displayText = `Available until ${nextEventTime.toLocaleTimeString(
+            "en-US",
+            { hour: "numeric", minute: "2-digit" }
+          )}`;
+        } else {
+          displayText = `Available<br>${slotTime.toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+          })} - ${nextEventTime.toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+          })}`;
+        }
       }
 
-      html += `<td style="background-color:${bgColor}; text-align:center; vertical-align:middle; color:${color}; width:${colWidth}; border:1px solid #555; font-weight:bold;" rowspan="${span}">${displayText}</td>`;
+      html += `<td class="${classes.join(" ")}" rowspan="${span}">${displayText}</td>`;
     }
     html += "</tr>";
   }
@@ -210,7 +341,7 @@ async function buildCalendar() {
 }
 
 function refreshCalendar() {
-  buildCalendar().catch(err => console.error(err));
+  buildCalendar().catch((err) => console.error(err));
 }
 
 // ---- INITIAL LOAD ----
@@ -218,8 +349,10 @@ addNavButtons();
 setHeaderTitle();
 clearCalendar();
 
-fetchFeeds().then(data => {
-  feeds = data;
-  refreshCalendar();
-  setInterval(refreshCalendar, 60000);
-}).catch(err => console.error(err));
+fetchFeedsParallelWithProgress()
+  .then((data) => {
+    feeds = data;
+    refreshCalendar();
+    setInterval(refreshCalendar, 60000);
+  })
+  .catch((err) => console.error(err));
