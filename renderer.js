@@ -28,7 +28,7 @@ async function fetchFeedsWithProgress() {
     console.error("Error fetching feed index:", err);
     return [];
   }
-  console.write(feedIndex);
+  console.log(feedIndex);
 
   // Show progress bar
   if (progressContainer) progressContainer.style.display = "block";
