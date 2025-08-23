@@ -16,31 +16,39 @@ async function fetchFeeds() {
 async function fetchFeedsWithProgress() {
   const res = await fetch(webAppUrl);
   if (!res.ok) throw new Error(`Failed to fetch feeds: ${res.status}`);
-  const data = await res.json();
+  const feedList = await res.json();
 
   const progressBar = document.getElementById("progressBar");
-  const progressContainer = document.getElementById("progressContainer");
-  if (progressContainer) progressContainer.style.display = "block";
+  let completed = 0;
 
-  let loaded = 0;
-  const total = data.length;
-  progressBar.style.width = "0%";
+  // Run all fetches in parallel
+  const feedPromises = feedList.map(async (feed) => {
+    try {
+      const r = await fetch(feed.url);
+      if (!r.ok) throw new Error(`Failed to fetch ${feed.name}: ${r.status}`);
+      const icsText = await r.text();
 
-  // Kick off all fetches in parallel
-  const feedPromises = data.map(async (feed) => {
-    // simulate fetching / parsing per feed (you may add per-feed fetch if needed)
-    const jcalData = ICAL.parse(feed.ics); // ensure valid early
-    // increment as soon as each finishes
-    loaded++;
-    progressBar.style.width = `${Math.round((loaded / total) * 100)}%`;
-    return feed;
+      // validate ICS before returning
+      try {
+        ICAL.parse(icsText);
+      } catch (err) {
+        console.error(`Invalid ICS for ${feed.name}`, err);
+        return { ...feed, ics: "" }; // return blank if invalid
+      }
+
+      return { ...feed, ics: icsText };
+    } catch (e) {
+      console.error("Error fetching feed:", feed.url, e);
+      return { ...feed, ics: "" }; // gracefully handle errors
+    } finally {
+      completed++;
+      progressBar.style.width = `${(completed / feedList.length) * 100}%`;
+    }
   });
 
-  const feeds = await Promise.all(feedPromises);
-
-  if (progressContainer) progressContainer.style.display = "none";
-  return feeds;
+  return Promise.all(feedPromises);
 }
+
 
 
 function setHeaderTitle() {
