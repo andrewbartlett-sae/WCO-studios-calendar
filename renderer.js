@@ -37,7 +37,7 @@ async function fetchFeedsWithProgress() {
   for (let i = 0; i < feedIndex.length; i++) {
     try {
       const res = await fetch(feedIndex[i].url);
-      if (!res.ok) throw new Error(`Failed to fetch ${feedIndex[i].name}: ${res.status}`);
+      if (!res.ok) throw new Error(`Failed to fetch ${feedIndex[i].url}: ${res.status}`);
       const data = await res.json();
       feeds.push({ name: feedIndex[i].name, ics: data.ics });
     } catch (err) {
