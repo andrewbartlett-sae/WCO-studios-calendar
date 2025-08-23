@@ -208,7 +208,7 @@ async function buildCalendar() {
 
         if (isLate) {
           classes.push("late");
-          label = Late + " " + label;
+          label = "Late " + label;
         }
 
         displayText = `${label}<br>${evStart.toLocaleTimeString("en-US", {
