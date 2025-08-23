@@ -108,3 +108,19 @@ body {
   padding: 20px;
   font-weight: bold;
 }
+
+#progressContainer {
+  width: 100%;
+  background: #eee;
+  height: 20px;
+  margin: 10px 0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+#progressBar {
+  width: 0%;
+  height: 100%;
+  background: #4caf50;
+  transition: width 0.3s;
+}
