@@ -13,32 +13,45 @@ async function fetchFeeds() {
   return await res.json();
 }
 
+// Fetch all feeds with progress updates
 async function fetchFeedsWithProgress() {
-  const res = await fetch(webAppUrl);
-  if (!res.ok) throw new Error(`Failed to fetch feeds: ${res.status}`);
-  const data = await res.json();
-
   const progressBar = document.getElementById("progressBar");
   const progressContainer = document.getElementById("progressContainer");
+
+  // Fetch the feed index first (list of feed URLs/names)
+  let feedIndex;
+  try {
+    const res = await fetch(webAppUrl + "?index=true");
+    if (!res.ok) throw new Error(`Failed to fetch feed index: ${res.status}`);
+    feedIndex = await res.json(); // Should be an array of feed info
+  } catch (err) {
+    console.error("Error fetching feed index:", err);
+    return [];
+  }
+
+  // Show progress bar
   if (progressContainer) progressContainer.style.display = "block";
+  if (progressBar) progressBar.value = 0;
 
-  let loaded = 0;
-  const total = data.length;
-  progressBar.style.width = "0%";
+  const feeds = [];
+  for (let i = 0; i < feedIndex.length; i++) {
+    try {
+      const res = await fetch(feedIndex[i].url);
+      if (!res.ok) throw new Error(`Failed to fetch ${feedIndex[i].name}: ${res.status}`);
+      const data = await res.json();
+      feeds.push({ name: feedIndex[i].name, ics: data.ics });
+    } catch (err) {
+      console.error("Error fetching feed:", feedIndex[i].name, err);
+      feeds.push({ name: feedIndex[i].name, ics: "" }); // fallback for error
+    }
 
-  // Kick off all fetches in parallel
-  const feedPromises = data.map(async (feed) => {
-    // simulate fetching / parsing per feed (you may add per-feed fetch if needed)
-    const jcalData = ICAL.parse(feed.ics); // ensure valid early
-    // increment as soon as each finishes
-    loaded++;
-    progressBar.style.width = `${Math.round((loaded / total) * 100)}%`;
-    return feed;
-  });
+    // Update progress
+    if (progressBar) progressBar.value = ((i + 1) / feedIndex.length) * 100;
+  }
 
-  const feeds = await Promise.all(feedPromises);
-
+  // Hide progress bar once done
   if (progressContainer) progressContainer.style.display = "none";
+
   return feeds;
 }
 
