@@ -5,7 +5,7 @@ let feeds = [];
 let currentDate = new Date();
 const startHour = 8;
 const endHour = 21;
-const version = "v1.1"; // loading bar added
+const version = "v1.2"; // loading bar added
 
 async function fetchFeeds() {
   const res = await fetch(webAppUrlAllCalendars);
@@ -13,50 +13,38 @@ async function fetchFeeds() {
   return await res.json();
 }
 
-async function fetchFeedsWithProgress() {
-  // 1. Get feed index
-  let feedIndex;
-  try {
-    const res = await fetch(webAppUrl);
-    if (!res.ok) throw new Error(`Failed to fetch feed index: ${res.status}`);
-    feedIndex = await res.json();
-  } catch (err) {
-    console.error("Error fetching feed index:", err);
-    return;
-  }
+// Fetch feeds in parallel with progress updates
+async function fetchFeedsWithProgress(feedIndex) {
+  const bar = document.getElementById("progressBar");
+  if (!bar) console.warn("Progress bar element not found");
 
-  // 2. Assign proper URL to each feed
-  // Assume feedIndex has { name } and we generate URL dynamically, or it's included
-  feedIndex.forEach(f => {
+  feeds = Array(feedIndex.length); // pre-fill
+
+  let loadedCount = 0;
+
+  const fetchPromises = feedIndex.map(async (f, i) => {
     if (!f.url) {
-      // Example: append name as query param to webAppUrl
-      f.url = `${webAppUrl}?feed=${encodeURIComponent(f.name)}`;
+      console.error("Feed missing URL:", f.name);
+      feeds[i] = { name: f.name, ics: "" };
+      return;
+    }
+
+    try {
+      const res = await fetch(f.url);
+      if (!res.ok) throw new Error(`Failed to fetch ${f.name}: ${res.status}`);
+      const ics = await res.text();
+      feeds[i] = { name: f.name, ics };
+    } catch (err) {
+      console.error("Error fetching feed:", f.name, err);
+      feeds[i] = { name: f.name, ics: "" };
+    } finally {
+      loadedCount++;
+      if (bar) bar.style.width = `${Math.round((loadedCount / feedIndex.length) * 100)}%`;
     }
   });
 
-  feeds = []; // clear previous feeds
-  progressBar.style.width = "0%";
-
-  // 3. Fetch each feed sequentially and update progress
-  for (let i = 0; i < feedIndex.length; i++) {
-    try {
-      console.log("Fetching:", feedIndex[i].url);
-      const res = await fetch(feedIndex[i].url);
-      if (!res.ok) throw new Error(`Failed to fetch ${feedIndex[i].name}: ${res.status}`);
-      const icsText = await res.text();
-      feeds.push({ name: feedIndex[i].name, ics: icsText });
-    } catch (err) {
-      console.error("Error fetching feed:", feedIndex[i].name, err);
-      feeds.push({ name: feedIndex[i].name, ics: "" }); // placeholder for error
-    }
-
-    // Update progress
-    const pct = Math.round(((i + 1) / feedIndex.length) * 100);
-    progressBar.style.width = pct + "%";
-  }
-
-  progressBar.style.width = "100%";
-  console.log("All feeds fetched.");
+  await Promise.all(fetchPromises);
+  console.log("All feeds fetched:", feeds);
 }
 
 function setHeaderTitle() {
