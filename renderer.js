@@ -38,6 +38,7 @@ const weekTypes = {
 
 // ---------------- Date Ranges for Week Types ----------------
 const weekTypeRanges = [
+  { type: "Trimester", start: "2025-05-26", end: "2025-08-24" },//25T2
   { type: "Trimester", start: "2025-09-15", end: "2025-12-14" },//25T3
   { type: "Closed", start: "2025-12-25", end: "2026-01-11" },   //Xmas break
   { type: "Trimester", start: "2026-02-02", end: "2026-05-03" } //26T1
