@@ -121,6 +121,7 @@ function setHeaderTitle() {
   if (!header) {
     header = document.createElement("h1");
     header.id="calendarHeader";
+    header.classList.add("neonOrange");
     document.body.prepend(header);
 
     const versionTag = document.createElement("div");
