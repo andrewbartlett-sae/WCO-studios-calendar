@@ -5,7 +5,7 @@ let feeds = [];
 let currentDate = new Date();
 const startHour = 8;
 const endHour = 21;
-const version = "v1.2"; // loading bar added
+const version = "v1.3";
 
 async function fetchFeeds() {
   const res = await fetch(webAppUrlAllCalendars);
@@ -13,8 +13,16 @@ async function fetchFeeds() {
   return await res.json();
 }
 
+// Fetch feed index first
+async function fetchFeedIndex() {
+  const res = await fetch(webAppUrl);
+  if (!res.ok) throw new Error(`Failed to fetch feed index: ${res.status}`);
+  return await res.json(); // returns array of { name, ics }
+}
+
 // Fetch feeds in parallel with progress updates
-async function fetchFeedsWithProgress(feedIndex) {
+async function fetchFeedsWithProgress() {
+  const feedIndex = fetchFeedIndex();
   const bar = document.getElementById("progressBar");
   if (!bar) console.warn("Progress bar element not found");
 
