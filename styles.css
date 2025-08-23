@@ -54,10 +54,21 @@ body {
 }
 
 /* Table */
+tr:last-child > td, tr:last-child > th {
+  border-bottom: 0;
+}
+
+table.layout th,
+table.layout td {
+  border: 0;
+  padding: 0;
+}
+
 #calendarTable {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
+  border-spacing: 0;
 }
 
 #calendarTable th,
@@ -67,10 +78,18 @@ body {
   vertical-align: middle;
   font-weight: bold;
   font-family: inherit;
+
+  border-bottom: 1px solid #ebebeb;
+  border-right: 1px solid #ebebeb;
+  vertical-align: text-top;
 }
 
 #calendarTable th {
-  background-color: var(--panel);
+  /*background-color: var(--panel);*/
+  
+  color: #ffffff;
+  background-color: #4b667b;
+  padding: 5px 0 5px 0;
 }
 
 #calendarTable td.timeCell {
