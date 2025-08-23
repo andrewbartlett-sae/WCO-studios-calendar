@@ -124,3 +124,16 @@ body {
   background: #4caf50;
   transition: width 0.3s;
 }
+
+.neonOrange {
+  color: #fff;
+  text-shadow:
+    0 0 5px #fff,
+    0 0 10px #fff,
+    0 0 20px #fff,
+    0 0 40px #FA0,
+    0 0 80px #FA0,
+    0 0 90px #FA0,
+    0 0 100px #FA0,
+    0 0 150px #FA0;
+}
