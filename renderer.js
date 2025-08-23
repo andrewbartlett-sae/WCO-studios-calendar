@@ -1,39 +1,47 @@
-const webAppUrl = "https://script.google.com/a/macros/sae.edu.au/s/AKfycbyMHnsDas6I5BgijywmpdufRa6AfTRsCGTkXZ_eC_pXKN9pEh-aVOvw2BAibSmJjU2I_w/exec";
-const webAppUrlWithProgress = "https://script.google.com/macros/s/AKfycbwdz5SJ3m7fHq_7U6nG8P7yH9TLHCM9fJ8F14SRFIx8pWVsom6P8NOIdhwOY0-MedSN/exec";
+const webAppUrlAllCalendars = "https://script.google.com/a/macros/sae.edu.au/s/AKfycbyMHnsDas6I5BgijywmpdufRa6AfTRsCGTkXZ_eC_pXKN9pEh-aVOvw2BAibSmJjU2I_w/exec";
+const webAppUrl = "https://script.google.com/macros/s/AKfycbwdz5SJ3m7fHq_7U6nG8P7yH9TLHCM9fJ8F14SRFIx8pWVsom6P8NOIdhwOY0-MedSN/exec";
 
 let feeds = [];
 let currentDate = new Date();
 const startHour = 8;
 const endHour = 21;
-const version = "v1.5"; // loading bar added
+const version = "v1.6"; // loading bar added
 
 async function fetchFeeds() {
-  const res = await fetch(webAppUrl);
+  const res = await fetch(webAppUrlAllCalendars);
   if (!res.ok) throw new Error(`Failed to fetch feeds: ${res.status}`);
   return await res.json();
 }
 
 async function fetchFeedsWithProgress() {
-  const progress = document.getElementById("progressBar");
-  progress.style.width = "0%";
+  const res = await fetch(webAppUrl);
+  if (!res.ok) throw new Error(`Failed to fetch feeds: ${res.status}`);
+  const data = await res.json();
 
-  // Step 1: Get feed list (names + count)
-  const metaRes = await fetch(webAppUrlWithProgress);
-  if (!metaRes.ok) throw new Error("Failed to fetch feed list");
-  const feedList = await metaRes.json();
+  const progressBar = document.getElementById("progressBar");
+  const progressContainer = document.getElementById("progressContainer");
+  if (progressContainer) progressContainer.style.display = "block";
 
-  const feedsData = [];
-  for (let i = 0; i < feedList.length; i++) {
-    const res = await fetch(`${webAppUrlWithProgress}?feed=${i}`);
-    const data = await res.json();
-    feedsData.push(data);
+  let loaded = 0;
+  const total = data.length;
+  progressBar.style.width = "0%";
 
-    // update progress
-    progress.style.width = ((i + 1) / feedList.length) * 100 + "%";
-  }
+  // Kick off all fetches in parallel
+  const feedPromises = data.map(async (feed) => {
+    // simulate fetching / parsing per feed (you may add per-feed fetch if needed)
+    const jcalData = ICAL.parse(feed.ics); // ensure valid early
+    // increment as soon as each finishes
+    loaded++;
+    progressBar.style.width = `${Math.round((loaded / total) * 100)}%`;
+    return feed;
+  });
 
-  return feedsData;
+  const feeds = await Promise.all(feedPromises);
+
+  if (progressContainer) progressContainer.style.display = "none";
+  return feeds;
 }
+
 
 function setHeaderTitle() {
   let header = document.getElementById("calendarHeader");
