@@ -5,7 +5,7 @@ let feeds = [];
 let currentDate = new Date();
 const startHour = 8;
 const endHour = 21;
-const version = "v1.3";
+const version = "v1.0";
 
 async function fetchFeeds() {
   const res = await fetch(webAppUrlAllCalendars);
@@ -13,11 +13,21 @@ async function fetchFeeds() {
   return await res.json();
 }
 
-// Fetch feed index first
-async function fetchFeedIndex() {
-  const res = await fetch(webAppUrl);
-  if (!res.ok) throw new Error(`Failed to fetch feed index: ${res.status}`);
-  return await res.json(); // returns array of { name, ics }
+async function fetchAllFeeds() {
+  try {
+    // 1. Fetch index from the apps script
+    const res = await fetch(webAppUrl); // returns array of {name, url}
+    if (!res.ok) throw new Error(`Failed to fetch feed index: ${res.status}`);
+    const feedIndex = await res.json();
+
+    // 2. Fetch each ICS feed in parallel with progress
+    await fetchFeedsWithProgress(feedIndex);
+
+    // 3. Now feeds[] is populated, can build calendar
+    refreshCalendar();
+  } catch (err) {
+    console.error("Error fetching feeds:", err);
+  }
 }
 
 // Fetch feeds in parallel with progress updates
@@ -324,7 +334,7 @@ addNavButtons();
 setHeaderTitle();
 clearCalendar();
 
-fetchFeedsWithProgress()
+fetchAllFeeds()
   .then((data) => {
     feeds = data;
     refreshCalendar();
