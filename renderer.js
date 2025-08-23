@@ -5,7 +5,7 @@ let feeds = [];
 let currentDate = new Date();
 const startHour = 8;
 const endHour = 21;
-const version = "v1.4"; // stylesheet refactor + no inline styles
+const version = "v1.1"; // stylesheet refactor + no inline styles
 
 async function fetchFeeds() {
   const res = await fetch(webAppUrl);
@@ -206,7 +206,10 @@ async function buildCalendar() {
         else if (isCheckout) classes.push("checkout");
         else classes.push("booked");
 
-        if (isLate) classes.push("late");
+        if (isLate) {
+          classes.push("late");
+          label = Late + " " + label;
+        }
 
         displayText = `${label}<br>${evStart.toLocaleTimeString("en-US", {
           hour: "numeric",
