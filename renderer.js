@@ -63,7 +63,7 @@ function addNavButtons() {
 
     const refreshBts = document.createElement("button");
     refreshBts.textContent = "Refresh";
-    refreshBts.onclick = () => {
+    refreshBts.onclick = async () => {
       clearCalendar();
       try {
         feeds = await fetchFeeds();  // refetch from Google Apps Script
