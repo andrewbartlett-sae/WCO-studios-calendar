@@ -5,7 +5,7 @@ let feeds = [];
 let currentDate = new Date();
 const startHour = 8;
 const endHour = 21;
-const version = "v1.2"; // loading bar added
+const version = "v1.3"; // loading bar added
 
 async function fetchFeeds() {
   const res = await fetch(webAppUrlAllCalendars);
@@ -37,6 +37,7 @@ async function fetchFeedsWithProgress() {
   const feeds = [];
   for (let i = 0; i < feedIndex.length; i++) {
     try {
+      console.log(feedIndex[i].url);
       const res = await fetch(feedIndex[i].url);
       if (!res.ok) throw new Error(`Failed to fetch ${feedIndex[i].url}: ${res.status}`);
       const data = await res.json();
