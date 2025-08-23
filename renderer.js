@@ -6,7 +6,7 @@ let feeds = [];
 let currentDate = new Date();
 const version = "v1.0";
 
-// ---------------- Week Types ----------------
+// ---------------- Week Types -----------------
 const weekTypes = {
   Default: {
     0: null,
