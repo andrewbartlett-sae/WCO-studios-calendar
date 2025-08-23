@@ -137,3 +137,35 @@ body {
     0 0 100px #FA0,
     0 0 150px #FA0;
 }
+
+.orangeGlow {
+  animation: orangeGlower 12s ease-in-out infinite;
+}
+
+@keyframes orangeGlower {
+  0%,
+  100% {
+    color: #fff;
+    text-shadow:
+      0 0 5px #fff,
+      0 0 10px #fff,
+      0 0 20px #fff,
+      0 0 40px #FA0,
+      0 0 80px #FA0,
+      0 0 90px #FA0,
+      0 0 100px #FA0,
+      0 0 150px #FA0;
+  }
+  50% {
+    color: #fff;
+    text-shadow:
+      0 0 5px #FA0,
+      0 0 10px #FA0,
+      0 0 20px #FA0,
+      0 0 40px #850,
+      0 0 80px #850,
+      0 0 90px #850,
+      0 0 100px #850,
+      0 0 150px #850;
+  }
+}
