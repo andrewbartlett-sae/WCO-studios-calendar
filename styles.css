@@ -1,115 +1,126 @@
 :root {
---bg: #000;
---panel: #1e1e1e;
---text: #eee;
---muted: #888;
---border: #555;
---available: #2a2a2a;
---reservation: #4a90e2;
---checkout: #4caf50;
---late: #FAA;
+  --bg: #000;
+  --panel: #1e1e1e;
+  --text: #eee;
+  --muted: #888;
+  --border: #555;
+  --available: #2a2a2a;
+  --reservation: #0352ad;
+  --checkout: #4caf50;
+  --booked: #444;
+  --late-text: #FAA;
 }
 
-{ box-sizing: border-box; }
+/* General Layout */
 body {
-margin: 0;
-font-family: sans-serif;
-color: var(--text);
-background-color: var(--bg);
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+    "Noto Sans", "Liberation Sans", sans-serif;
+  color: var(--text);
+  background-color: var(--bg);
 }
 
-/* Header + version */
 #calendarHeader {
-color: var(--text);
-text-align: center;
-margin: 10px 0 5px;
+  text-align: center;
+  margin: 10px 0 5px;
 }
 
 #calendarVersion {
-color: var(--muted);
-font-size: 10px;
-text-align: center;
-margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 10px;
+  text-align: center;
+  margin: 0 0 20px;
 }
 
-/* Navigation */
 #calendarNav {
-text-align: center;
-margin: 10px 0;
+  text-align: center;
+  margin: 10px 0;
 }
 
 #calendarNav button {
-background: var(--panel);
-color: var(--text);
-border: 1px solid var(--border);
-border-radius: 4px;
-padding: 6px 10px;
-margin-right: 10px;
-cursor: pointer;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  margin-right: 10px;
+  cursor: pointer;
 }
 #calendarNav button:last-child {
-margin-right: 0;
+  margin-right: 0;
 }
 #calendarNav button:hover {
-filter: brightness(1.1);
+  filter: brightness(1.1);
 }
 
-/* Table /
+/* Table */
 #calendarTable {
-width: 100%;
-border-collapse: collapse;
-table-layout: fixed; / even column widths */
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
 }
 
 #calendarTable th,
 #calendarTable td {
-border: 1px solid var(--border);
-text-align: center;
-vertical-align: middle;
-font-weight: bold;
-color: var(--text);
+  border: 1px solid var(--border);
+  text-align: center;
+  vertical-align: middle;
+  font-weight: bold;
+  font-family: inherit;
 }
 
-/* Header cells */
 #calendarTable th {
-background-color: var(--panel);
+  background-color: var(--panel);
 }
 
-/* Time column cells */
 #calendarTable td.timeCell {
-background-color: var(--panel);
+  background-color: var(--panel);
 }
 
-/* Data cells */
-#calendarTable td.cell {
-background-color: var(--available);
-}
-
-/* States */
+/* Availability states */
 #calendarTable td.cell.available {
-background-color: var(--available);
+  background-color: var(--available);
 }
 
 #calendarTable td.cell.reservation {
-background-color: var(--reservation);
+  background-color: var(--reservation);
+  color: #fff; /* ensure legible */
 }
 
 #calendarTable td.cell.checkout {
-background-color: var(--checkout);
+  background-color: var(--checkout);
+  color: #fff;
 }
 
 #calendarTable td.cell.booked {
-background-color: var(--panel);
+  background-color: var(--booked);
+  color: var(--text);
 }
 
 #calendarTable td.cell.late {
-color: var(--late);
+  color: var(--late-text);
 }
 
 /* Loading cell */
 #calendarTable td.loading {
-color: var(--text);
-text-align: center;
-padding: 20px;
-font-weight: bold;
+  color: var(--text);
+  text-align: center;
+  padding: 20px;
+  font-weight: bold;
+}
+
+#progressContainer {
+  width: 100%;
+  background: #eee;
+  height: 20px;
+  margin: 10px 0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+#progressBar {
+  width: 0%;
+  height: 100%;
+  background: #4caf50;
+  transition: width 0.3s;
 }
