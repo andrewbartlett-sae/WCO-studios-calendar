@@ -5,7 +5,7 @@ let feeds = [];
 let currentDate = new Date();
 const startHour = 8;
 const endHour = 21;
-const version = "v1.1";
+const version = "v1.3";
 
 async function fetchFeeds() {
   const res = await fetch(webAppUrlAllCalendars);
@@ -13,55 +13,53 @@ async function fetchFeeds() {
   return await res.json();
 }
 
-async function fetchAllFeeds() {
+async function fetchFeedsWithProgress() {
+  const progressBar = document.getElementById("progressBar");
+  const progressText = document.getElementById("progressText");
+
+  // 1. Fetch the feed index
+  let feedIndex;
   try {
-    // 1. Fetch index from the apps script
-    const res = await fetch(webAppUrl); // returns array of {name, url}
+    const res = await fetch(webAppUrl); // main endpoint returns feed metadata
     if (!res.ok) throw new Error(`Failed to fetch feed index: ${res.status}`);
-    const feedIndex = await res.json();
-
-    // 2. Fetch each ICS feed in parallel with progress
-    await fetchFeedsWithProgress(feedIndex);
-
-    // 3. Now feeds[] is populated, can build calendar
-    refreshCalendar();
+    feedIndex = await res.json(); // array of feed metadata
   } catch (err) {
-    console.error("Error fetching feeds:", err);
+    console.error("Error fetching feed index:", err);
+    return [];
   }
-}
 
-// Fetch feeds in parallel with progress updates
-async function fetchFeedsWithProgress(feedIndex) {
-  const bar = document.getElementById("progressBar");
-  if (!bar) console.warn("Progress bar element not found");
+  // 2. Construct URLs for each feed
+  const feedUrls = feedIndex.map((feed, i) => {
+    if (feed.id !== undefined) return `${webAppUrl}?feedIndex=${feed.id}`;
+    if (feed.name) return `${webAppUrl}?feedName=${encodeURIComponent(feed.name)}`;
+    console.error("Cannot construct URL for feed:", feed);
+    return null;
+  });
 
-  feeds = Array(feedIndex.length); // pre-fill
+  const totalFeeds = feedUrls.length;
+  let completedFeeds = 0;
 
-  let loadedCount = 0;
-
-  const fetchPromises = feedIndex.map(async (f, i) => {
-    if (!f.url) {
-      console.error("Feed missing URL:", f.name);
-      feeds[i] = { name: f.name, ics: "" };
-      return;
-    }
+  // 3. Fetch all feeds in parallel
+  const fetchPromises = feedUrls.map(async (url, i) => {
+    if (!url) return { name: feedIndex[i].name || `Feed ${i}`, ics: "" };
 
     try {
-      const res = await fetch(f.url);
-      if (!res.ok) throw new Error(`Failed to fetch ${f.name}: ${res.status}`);
-      const ics = await res.text();
-      feeds[i] = { name: f.name, ics };
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Failed to fetch ${feedIndex[i].name || i}: ${res.status}`);
+      const feedData = await res.json();
+      return feedData;
     } catch (err) {
-      console.error("Error fetching feed:", f.name, err);
-      feeds[i] = { name: f.name, ics: "" };
+      console.error("Error fetching feed:", url, err);
+      return { name: feedIndex[i].name || `Feed ${i}`, ics: "" };
     } finally {
-      loadedCount++;
-      if (bar) bar.style.width = `${Math.round((loadedCount / feedIndex.length) * 100)}%`;
+      completedFeeds++;
+      if (progressBar) progressBar.value = (completedFeeds / totalFeeds) * 100;
+      if (progressText) progressText.textContent = `Loading feed ${completedFeeds} of ${totalFeeds}`;
     }
   });
 
-  await Promise.all(fetchPromises);
-  console.log("All feeds fetched:", feeds);
+  const feedsData = await Promise.all(fetchPromises);
+  return feedsData;
 }
 
 function setHeaderTitle() {
@@ -333,7 +331,7 @@ addNavButtons();
 setHeaderTitle();
 clearCalendar();
 
-fetchAllFeeds()
+fetchFeedsWithProgress()
   .then((data) => {
     feeds = data;
     refreshCalendar();
