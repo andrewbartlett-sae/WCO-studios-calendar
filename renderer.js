@@ -5,7 +5,7 @@ let feeds = [];
 let currentDate = new Date();
 const startHour = 8;
 const endHour = 21;
-const version = "v1.3"; // loading bar added
+const version = "v1.1"; // loading bar added
 
 async function fetchFeeds() {
   const res = await fetch(webAppUrlAllCalendars);
@@ -13,48 +13,50 @@ async function fetchFeeds() {
   return await res.json();
 }
 
-// Fetch all feeds with progress updates
 async function fetchFeedsWithProgress() {
-  const progressBar = document.getElementById("progressBar");
-  const progressContainer = document.getElementById("progressContainer");
-
-  // Fetch the feed index first (list of feed URLs/names)
+  // 1. Get feed index
   let feedIndex;
   try {
-    const res = await fetch(webAppUrl + "?index=true");
+    const res = await fetch(webAppUrl);
     if (!res.ok) throw new Error(`Failed to fetch feed index: ${res.status}`);
-    feedIndex = await res.json(); // Should be an array of feed info
+    feedIndex = await res.json();
   } catch (err) {
     console.error("Error fetching feed index:", err);
-    return [];
+    return;
   }
-  console.log(feedIndex);
 
-  // Show progress bar
-  if (progressContainer) progressContainer.style.display = "block";
-  if (progressBar) progressBar.value = 0;
+  // 2. Assign proper URL to each feed
+  // Assume feedIndex has { name } and we generate URL dynamically, or it's included
+  feedIndex.forEach(f => {
+    if (!f.url) {
+      // Example: append name as query param to webAppUrl
+      f.url = `${webAppUrl}?feed=${encodeURIComponent(f.name)}`;
+    }
+  });
 
-  const feeds = [];
+  feeds = []; // clear previous feeds
+  progressBar.style.width = "0%";
+
+  // 3. Fetch each feed sequentially and update progress
   for (let i = 0; i < feedIndex.length; i++) {
     try {
-      console.log(feedIndex[i].url);
+      console.log("Fetching:", feedIndex[i].url);
       const res = await fetch(feedIndex[i].url);
-      if (!res.ok) throw new Error(`Failed to fetch ${feedIndex[i].url}: ${res.status}`);
-      const data = await res.json();
-      feeds.push({ name: feedIndex[i].name, ics: data.ics });
+      if (!res.ok) throw new Error(`Failed to fetch ${feedIndex[i].name}: ${res.status}`);
+      const icsText = await res.text();
+      feeds.push({ name: feedIndex[i].name, ics: icsText });
     } catch (err) {
       console.error("Error fetching feed:", feedIndex[i].name, err);
-      feeds.push({ name: feedIndex[i].name, ics: "" }); // fallback for error
+      feeds.push({ name: feedIndex[i].name, ics: "" }); // placeholder for error
     }
 
     // Update progress
-    if (progressBar) progressBar.value = ((i + 1) / feedIndex.length) * 100;
+    const pct = Math.round(((i + 1) / feedIndex.length) * 100);
+    progressBar.style.width = pct + "%";
   }
 
-  // Hide progress bar once done
-  if (progressContainer) progressContainer.style.display = "none";
-
-  return feeds;
+  progressBar.style.width = "100%";
+  console.log("All feeds fetched.");
 }
 
 function setHeaderTitle() {
