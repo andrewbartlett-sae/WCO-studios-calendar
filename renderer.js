@@ -1,5 +1,5 @@
-//const webAppUrl = "https://script.google.com/a/macros/sae.edu.au/s/AKfycbyMHnsDas6I5BgijywmpdufRa6AfTRsCGTkXZ_eC_pXKN9pEh-aVOvw2BAibSmJjU2I_w/exec";
-const webAppUrl = "https://script.google.com/macros/s/AKfycbwdz5SJ3m7fHq_7U6nG8P7yH9TLHCM9fJ8F14SRFIx8pWVsom6P8NOIdhwOY0-MedSN/exec";
+const webAppUrl = "https://script.google.com/a/macros/sae.edu.au/s/AKfycbyMHnsDas6I5BgijywmpdufRa6AfTRsCGTkXZ_eC_pXKN9pEh-aVOvw2BAibSmJjU2I_w/exec";
+const webAppUrlWithProgress = "https://script.google.com/macros/s/AKfycbwdz5SJ3m7fHq_7U6nG8P7yH9TLHCM9fJ8F14SRFIx8pWVsom6P8NOIdhwOY0-MedSN/exec";
 
 let feeds = [];
 let currentDate = new Date();
@@ -18,13 +18,13 @@ async function fetchFeedsWithProgress() {
   progress.style.width = "0%";
 
   // Step 1: Get feed list (names + count)
-  const metaRes = await fetch(webAppUrl);
+  const metaRes = await fetch(webAppUrlWithProgress);
   if (!metaRes.ok) throw new Error("Failed to fetch feed list");
   const feedList = await metaRes.json();
 
   const feedsData = [];
   for (let i = 0; i < feedList.length; i++) {
-    const res = await fetch(`${webAppUrl}?feed=${i}`);
+    const res = await fetch(`${webAppUrlWithProgress}?feed=${i}`);
     const data = await res.json();
     feedsData.push(data);
 
