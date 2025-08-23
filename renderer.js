@@ -5,7 +5,7 @@ let feeds = [];
 let currentDate = new Date();
 const startHour = 8;
 const endHour = 21;
-const version = "v1.6"; // loading bar added
+const version = "v1.1"; // loading bar added
 
 async function fetchFeeds() {
   const res = await fetch(webAppUrlAllCalendars);
