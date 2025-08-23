@@ -14,7 +14,7 @@
 /* General Layout */
 body {
   background-image: url("https://docs.google.com/uc?id=1cbjiXImF41rz2Xjm_X2PE69sDG49yWO5&export=download");
-  margin: 1;
+  margin: 1px;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,"Noto Sans", "Liberation Sans", sans-serif;
   color: var(--text);
   background-color: var(--bg);
