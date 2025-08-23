@@ -1,16 +1,38 @@
-const webAppUrl =
-  "https://script.google.com/a/macros/sae.edu.au/s/AKfycbyMHnsDas6I5BgijywmpdufRa6AfTRsCGTkXZ_eC_pXKN9pEh-aVOvw2BAibSmJjU2I_w/exec";
+//const webAppUrl = "https://script.google.com/a/macros/sae.edu.au/s/AKfycbyMHnsDas6I5BgijywmpdufRa6AfTRsCGTkXZ_eC_pXKN9pEh-aVOvw2BAibSmJjU2I_w/exec";
+const webAppUrl = "https://script.google.com/macros/s/AKfycbwdz5SJ3m7fHq_7U6nG8P7yH9TLHCM9fJ8F14SRFIx8pWVsom6P8NOIdhwOY0-MedSN/exec";
 
 let feeds = [];
 let currentDate = new Date();
 const startHour = 8;
 const endHour = 21;
-const version = "v1.1"; // stylesheet refactor + no inline styles
+const version = "v1.5"; // loading bar added
 
 async function fetchFeeds() {
   const res = await fetch(webAppUrl);
   if (!res.ok) throw new Error(`Failed to fetch feeds: ${res.status}`);
   return await res.json();
+}
+
+async function fetchFeedsWithProgress() {
+  const progress = document.getElementById("progressBar");
+  progress.style.width = "0%";
+
+  // Step 1: Get feed list (names + count)
+  const metaRes = await fetch(webAppUrl);
+  if (!metaRes.ok) throw new Error("Failed to fetch feed list");
+  const feedList = await metaRes.json();
+
+  const feedsData = [];
+  for (let i = 0; i < feedList.length; i++) {
+    const res = await fetch(`${webAppUrl}?feed=${i}`);
+    const data = await res.json();
+    feedsData.push(data);
+
+    // update progress
+    progress.style.width = ((i + 1) / feedList.length) * 100 + "%";
+  }
+
+  return feedsData;
 }
 
 function setHeaderTitle() {
@@ -282,7 +304,7 @@ addNavButtons();
 setHeaderTitle();
 clearCalendar();
 
-fetchFeeds()
+fetchFeedsWithProgress()
   .then((data) => {
     feeds = data;
     refreshCalendar();
