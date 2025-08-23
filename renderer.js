@@ -61,6 +61,19 @@ function addNavButtons() {
     };
     nav.appendChild(todayBtn);
 
+    const refreshBts = document.createElement("button");
+    refreshBts.textContent = "Refresh";
+    refreshBts.onclick = () => {
+      clearCalendar();
+      try {
+        feeds = await fetchFeeds();  // refetch from Google Apps Script
+        refreshCalendar();           // rebuild table with fresh data
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    nav.appendChild(refreshBts);
+
     const nextBtn = document.createElement("button");
     nextBtn.textContent = "Next Day →";
     nextBtn.onclick = () => {
