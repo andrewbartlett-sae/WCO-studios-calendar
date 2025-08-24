@@ -1,7 +1,7 @@
 :root {
   --bg: #eee;
   --panel: #1e1e1e;
-  --text: #000;
+  --text: #eee;
   --muted: #888;
   --border: #555;
   --available: #2a2a2a;
@@ -204,20 +204,43 @@ table.layout td {
   border-radius: 6px;
   text-decoration: none;
   background: -webkit-gradient(linear, left top, left bottom, color-stop(0.00, #70b6f2), color-stop(0.50, #54a3ee), color-stop(0.50, #3690f0), color-stop(1.00, #1a62db));
-  background: -webkit-linear-gradient(top, #70b6f2 0%, #54a3ee 50%, #3690f0 50%, #1a62db 100%);background: -moz-linear-gradient(top, #70b6f2 0%, #54a3ee 50%, #3690f0 50%, #1a62db 100%);
-  background: -o-linear-gradient(top, #70b6f2 0%, #54a3ee 50%, #3690f0 50%, #1a62db 100%);background: -ms-linear-gradient(top, #70b6f2 0%, #54a3ee 50%, #3690f0 50%, #1a62db 100%);
+  background: -webkit-linear-gradient(top, #70b6f2 0%, #54a3ee 50%, #3690f0 50%, #1a62db 100%);
+  background: -moz-linear-gradient(top, #70b6f2 0%, #54a3ee 50%, #3690f0 50%, #1a62db 100%);
+  background: -o-linear-gradient(top, #70b6f2 0%, #54a3ee 50%, #3690f0 50%, #1a62db 100%);
+  background: -ms-linear-gradient(top, #70b6f2 0%, #54a3ee 50%, #3690f0 50%, #1a62db 100%);
   background: linear-gradient(to bottom, #70b6f2 0%, #54a3ee 50%, #3690f0 50%, #1a62db 100%);
 }
 
 .greenGloss {
-  text-shadow: 0 -1px 1px rgba(0, 0, 0, 0.4), 0 1px 1px rgba(255, 255, 255, 0.5);border:none; box-shadow: inset 0 -1px 1px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.4);border-radius: 6px;text-decoration: none;background: -webkit-gradient(linear, left top, left bottom, color-stop(1.00, #b7ff7d), color-stop(0.52, #69b926), color-stop(0.50, #7fd33a), color-stop(0.00, #daffbc));background: -webkit-linear-gradient(top, #daffbc 0%, #7fd33a 50%, #69b926 52%, #b7ff7d 100%);background: -moz-linear-gradient(top, #daffbc 0%, #7fd33a 50%, #69b926 52%, #b7ff7d 100%);background: -o-linear-gradient(top, #daffbc 0%, #7fd33a 50%, #69b926 52%, #b7ff7d 100%);background: -ms-linear-gradient(top, #daffbc 0%, #7fd33a 50%, #69b926 52%, #b7ff7d 100%);background: linear-gradient(to bottom, #daffbc 0%, #7fd33a 50%, #69b926 52%, #b7ff7d 100%);
+  color: #000;
+  text-shadow: 0 -1px 1px rgba(0, 0, 0, 0.4), 0 1px 1px rgba(255, 255, 255, 0.5);
+  border:none;
+  box-shadow: inset 0 -1px 1px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  text-decoration: none;
+  background: -webkit-gradient(linear, left top, left bottom, color-stop(1.00, #b7ff7d), color-stop(0.52, #69b926), color-stop(0.50, #7fd33a), color-stop(0.00, #daffbc));
+  background: -webkit-linear-gradient(top, #daffbc 0%, #7fd33a 50%, #69b926 52%, #b7ff7d 100%);
+  background: -moz-linear-gradient(top, #daffbc 0%, #7fd33a 50%, #69b926 52%, #b7ff7d 100%);
+  background: -o-linear-gradient(top, #daffbc 0%, #7fd33a 50%, #69b926 52%, #b7ff7d 100%);
+  background: -ms-linear-gradient(top, #daffbc 0%, #7fd33a 50%, #69b926 52%, #b7ff7d 100%);
+  background: linear-gradient(to bottom, #daffbc 0%, #7fd33a 50%, #69b926 52%, #b7ff7d 100%);
 }
 
 .tealGloss {
-  text-shadow: 0 -1px 1px rgba(0, 0, 0, 0.4), 0 1px 1px rgba(255, 255, 255, 0.5);border: none;box-shadow: inset 0 -1px 1px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.4);border-radius: 6px;background: -webkit-gradient(linear, left top, left bottom, color-stop(1.00, #03b7ac), color-stop(0.52, #006662), color-stop(0.48, #69a7a4), color-stop(0.00, #c2d9df));background: -webkit-linear-gradient(top, #c2d9df 0%, #69a7a4 48%, #006662 52%, #03b7ac 100%);background: -moz-linear-gradient(top, #c2d9df 0%, #69a7a4 48%, #006662 52%, #03b7ac 100%);background: -o-linear-gradient(top, #c2d9df 0%, #69a7a4 48%, #006662 52%, #03b7ac 100%);background: -ms-linear-gradient(top, #c2d9df 0%, #69a7a4 48%, #006662 52%, #03b7ac 100%);background: linear-gradient(to bottom, #c2d9df 0%, #69a7a4 48%, #006662 52%, #03b7ac 100%);
+  color: #000;
+  text-shadow: 0 -1px 1px rgba(0, 0, 0, 0.4), 0 1px 1px rgba(255, 255, 255, 0.5);
+  border: none;box-shadow: inset 0 -1px 1px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  background: -webkit-gradient(linear, left top, left bottom, color-stop(1.00, #03b7ac), color-stop(0.52, #006662), color-stop(0.48, #69a7a4), color-stop(0.00, #c2d9df));
+  background: -webkit-linear-gradient(top, #c2d9df 0%, #69a7a4 48%, #006662 52%, #03b7ac 100%);
+  background: -moz-linear-gradient(top, #c2d9df 0%, #69a7a4 48%, #006662 52%, #03b7ac 100%);
+  background: -o-linear-gradient(top, #c2d9df 0%, #69a7a4 48%, #006662 52%, #03b7ac 100%);
+  background: -ms-linear-gradient(top, #c2d9df 0%, #69a7a4 48%, #006662 52%, #03b7ac 100%);
+  background: linear-gradient(to bottom, #c2d9df 0%, #69a7a4 48%, #006662 52%, #03b7ac 100%);
 }
 
 .greyGloss {
+  color: #eee;
   background: -moz-linear-gradient(top, transparent, #333); 
   background: -ms-linear-gradient(top, transparent, #333);  
   background: -o-linear-gradient(top, transparent, #333); 
