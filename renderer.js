@@ -1,8 +1,7 @@
 import { weekTypes, weekTypeRanges, singleDayOverrides } from "./calendarConfig.js";
 
 // ---------------- URLs ----------------
-const webAppUrl = "https://script.google.com/macros/s/AKfycbyCBR6phFMrllgZ_aYU0Uq2qHxQPj23jNwYlO_b4g1eLfqF6qnafiCkIZmoPxm94b4r/exec";
-const webAppUrlAllCalendars = "https://script.google.com/a/macros/sae.edu.au/s/AKfycbyMHnsDas6I5BgijywmpdufRa6AfTRsCGTkXZ_eC_pXKN9pEh-aVOvw2BAibSmJjU2I_w/exec";
+const webAppUrl = "https://script.google.com/macros/s/AKfycbzwcZ7wgnhWfqhfM6CxhdYK7MGbDlJy_l5ZLtna0MK9pxN1KjnN32ZAFiviaFW3kQI/exec";
 
 let feeds = [];
 let currentDate = new Date();
@@ -264,9 +263,24 @@ async function buildCalendar() {
 
         for (let k = r + 1; k < slots.length; k++) {
           const nextEvents = tableData[k][c];
-          const nextContent = nextEvents.length ? nextEvents[0].summary : "Available";
-          if ((cellEvents.length ? cellEvents[0].summary : "Available") !== nextContent) break;
-          span++;
+          // Only merge if both cells have events and they are the same event (same start/end)
+          if (
+            cellEvents.length &&
+            nextEvents.length &&
+            cellEvents[0].summary === nextEvents[0].summary &&
+            cellEvents[0].start.getTime() === nextEvents[0].start.getTime() &&
+            cellEvents[0].end.getTime() === nextEvents[0].end.getTime()
+          ) {
+            span++;
+          } else if (
+            !cellEvents.length &&
+            !nextEvents.length
+          ) {
+            // Both are available, merge
+            span++;
+          } else {
+            break;
+          }
         }
         rendered[localC] = span - 1;
 
