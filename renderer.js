@@ -263,19 +263,20 @@ async function buildCalendar() {
 
         for (let k = r + 1; k < slots.length; k++) {
           const nextEvents = tableData[k][c];
-          // Only merge if both cells have events and they are the same event (same start/end)
-          if (
-            cellEvents.length &&
-            nextEvents.length &&
-            cellEvents[0].summary === nextEvents[0].summary &&
-            cellEvents[0].start.getTime() === nextEvents[0].start.getTime() &&
-            cellEvents[0].end.getTime() === nextEvents[0].end.getTime()
-          ) {
+
+          // Compare all events in both slots
+          const eventsMatch =
+            cellEvents.length === nextEvents.length &&
+            cellEvents.every((ev, idx) =>
+              nextEvents[idx] &&
+              ev.summary === nextEvents[idx].summary &&
+              ev.start.getTime() === nextEvents[idx].start.getTime() &&
+              ev.end.getTime() === nextEvents[idx].end.getTime()
+            );
+
+          if (eventsMatch) {
             span++;
-          } else if (
-            !cellEvents.length &&
-            !nextEvents.length
-          ) {
+          } else if (!cellEvents.length && !nextEvents.length) {
             // Both are available, merge
             span++;
           } else {
@@ -287,23 +288,41 @@ async function buildCalendar() {
         const classes = ["cell"];
 
         if (cellEvents.length) {
-          const ev = cellEvents[0];
-          const evStart = ev.start;
-          const evEnd = ev.end;
+          if (cellEvents.length === 1) {
+            const ev = cellEvents[0];
+            const evStart = ev.start;
+            const evEnd = ev.end;
+            const isReservation = ev.summary.includes("Reservation");
+            const isCheckout = ev.summary.includes("Checkout");
+            let isLate = false;
+            if (isReservation) isLate = evStart < new Date(Date.now() - 30 * 60 * 1000);
+            if (isCheckout) isLate = evEnd < new Date();
 
-          const isReservation = ev.summary.includes("Reservation");
-          const isCheckout = ev.summary.includes("Checkout");
-          let isLate = false;
-          if (isReservation) isLate = evStart < new Date(Date.now() - 30 * 60 * 1000);
-          if (isCheckout) isLate = evEnd < new Date();
+            let label = isReservation ? "Reservation" : isCheckout ? "Checkout" : "Booked";
+            if (isReservation) classes.push("reservation");
+            else if (isCheckout) classes.push("checkout");
+            else classes.push("booked");
+            if (isLate) { classes.push("late"); label = "Late " + label; }
 
-          let label = isReservation ? "Reservation" : isCheckout ? "Checkout" : "Booked";
-          if (isReservation) classes.push("reservation");
-          else if (isCheckout) classes.push("checkout");
-          else classes.push("booked");
-          if (isLate) { classes.push("late"); label = "Late " + label; }
+            displayText = `${label}<br>${evStart.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} - ${evEnd.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+          } else if (cellEvents.length > 1) {
+            classes.push("multiple");
+            displayText = cellEvents.map(ev => {
+              const evStart = ev.start;
+              const evEnd = ev.end;
+              const isReservation = ev.summary.includes("Reservation");
+              const isCheckout = ev.summary.includes("Checkout");
+              let isLate = false;
+              if (isReservation) isLate = evStart < new Date(Date.now() - 30 * 60 * 1000);
+              if (isCheckout) isLate = evEnd < new Date();
 
-          displayText = `${label}<br>${evStart.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} - ${evEnd.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+              let label = isReservation ? "Reservation" : isCheckout ? "Checkout" : "Booked";
+              let eventClass = isReservation ? "blueGloss" : isCheckout ? "greenGloss" : "greyGloss";
+              if (isLate) label = "Late " + label;
+
+              return `<div class="${eventClass}">${label}<br>${evStart.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} - ${evEnd.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</div>`;
+            }).join('<hr style="border:none;border-top:1px solid #555;margin:4px 0;">');
+          }
         } else {
           classes.push("available");
 
