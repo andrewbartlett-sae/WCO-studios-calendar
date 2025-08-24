@@ -1,3 +1,5 @@
+import { weekTypes, weekTypeRanges, singleDayOverrides } from "./calendarConfig.js";
+
 // ---------------- URLs ----------------
 const webAppUrl = "https://script.google.com/macros/s/AKfycbyCBR6phFMrllgZ_aYU0Uq2qHxQPj23jNwYlO_b4g1eLfqF6qnafiCkIZmoPxm94b4r/exec";
 const webAppUrlAllCalendars = "https://script.google.com/a/macros/sae.edu.au/s/AKfycbyMHnsDas6I5BgijywmpdufRa6AfTRsCGTkXZ_eC_pXKN9pEh-aVOvw2BAibSmJjU2I_w/exec";
@@ -5,43 +7,6 @@ const webAppUrlAllCalendars = "https://script.google.com/a/macros/sae.edu.au/s/A
 let feeds = [];
 let currentDate = new Date();
 const version = "v1.0";
-
-// ---------------- Week Types -----------------
-const weekTypes = {
-  Default: {
-    0: null,
-    1: { start: 8, end: 18 },
-    2: { start: 8, end: 18 },
-    3: { start: 8, end: 18 },
-    4: { start: 8, end: 18 },
-    5: { start: 8, end: 18 },
-    6: null
-  },
-  Trimester: {
-    0: null,
-    1: { start: 8, end: 18 }, // Monday
-    2: { start: 8, end: 21 }, // Tuesday
-    3: { start: 8, end: 21 }, // Wednesday
-    4: { start: 8, end: 21 }, // Thursday
-    5: { start: 8, end: 18 }, // Friday
-    6: { start: 8, end: 18 }  // Saturday
-  },
-  Closed: { 0:null,1:null,2:null,3:null,4:null,5:null,6:null }
-};
-
-// ---------------- Date Ranges for Week Types ----------------
-const weekTypeRanges = [
-  { type: "Trimester", start: "2025-05-26", end: "2025-08-24" },//25T2
-  { type: "Trimester", start: "2025-09-15", end: "2025-12-14" },//25T3
-  { type: "Closed", start: "2025-12-25", end: "2026-01-11" },   //Xmas break
-  { type: "Trimester", start: "2026-02-02", end: "2026-05-03" } //26T1
-];
-
-// ---------------- Single-Day Overrides ----------------
-const singleDayOverrides = [
-  { date: "2025-08-21", hours: { start: 8, end: 12 } },
-  { date: "2026-05-26", hours: null } //Australia Day
-];
 
 // ---------------- Availability Helper ----------------
 function getHoursForDate(date) {
@@ -64,6 +29,23 @@ function getTimeSlots() {
   const hours = getHoursForDate(currentDate);
   if (!hours) return [];
   const slots = [];
+  // First slot is 8:10 (or whatever the start hour is)
+  slots.push(`${String(hours.start).padStart(2,"0")}:10`);
+  // The rest are on the hour, up to the hour before closing - 2
+  for (let h = hours.start + 1; h < hours.end - 2; h++) {
+    slots.push(`${String(h).padStart(2,"0")}:00`);
+  }
+  // Add the last slot, which is closing time minus 2 hours
+  if (hours.end - 2 >= hours.start) {
+    slots.push(`${String(hours.end - 2).padStart(2,"0")}:00`);
+  }
+  return slots;
+}
+
+function getTimeSlots_old() {
+  const hours = getHoursForDate(currentDate);
+  if (!hours) return [];
+  const slots = [];
   for (let h = hours.start; h <= hours.end; h++) {
     slots.push(`${String(h).padStart(2,"0")}:00`);
     if (h < hours.end) slots.push(`${String(h).padStart(2,"0")}:30`);
@@ -80,7 +62,7 @@ function toGMT8(icalTime) {
 function findSlotIndex(date, slots) {
   const h = date.getHours();
   const m = date.getMinutes();
-  const slotStr = `${String(h).padStart(2,"0")}:${m<30?"00":"30"}`;
+  const slotStr = `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
   return slots.indexOf(slotStr);
 }
 
@@ -88,7 +70,9 @@ function findSlotIndex(date, slots) {
 async function fetchFeedsParallelWithProgress() {
   const progress = document.getElementById("progressBar");
   const progressContainer = document.getElementById("progressContainer");
-  progressContainer.style.display = "block";
+  progressContainer.classList.add("loading");
+  
+  //progressContainer.style.display = "block";
   progress.style.width = "0%";
 
   const indexRes = await fetch(webAppUrl);
@@ -111,7 +95,8 @@ async function fetchFeedsParallelWithProgress() {
   );
 
   await Promise.all(fetchPromises);
-  progressContainer.style.display="none";
+  //progressContainer.style.display="none";
+  progressContainer.classList.remove("loading");
   return feedsData;
 }
 
@@ -152,7 +137,7 @@ function addNavButtons() {
 
     const refreshBtn=document.createElement("button");
     refreshBtn.textContent="Refresh";
-    refreshBtn.onclick=async()=>{ clearCalendar(); feeds=await fetchFeedsParallelWithProgress(); refreshCalendar(); };
+    refreshBtn.onclick=async()=>{ feeds=await fetchFeedsParallelWithProgress(); refreshCalendar(); };
     nav.appendChild(refreshBtn);
 
     const nextBtn=document.createElement("button");
@@ -180,7 +165,7 @@ async function buildCalendar() {
   const slots = getTimeSlots();
 
   if (slots.length===0) {
-    table.innerHTML=`<tr><td colspan="${feeds.length+1}" class="unavailable">Closed</td></tr>`;
+    table.innerHTML=`<tr><td colspan="${feeds.length+1}" class="unavailable">Campus Closed</td></tr>`;
     return;
   }
 
@@ -188,22 +173,45 @@ async function buildCalendar() {
 
   for(let i=0;i<feeds.length;i++){
     try{
+      console.debug(`Processing feed [${i}]: ${feeds[i].name}`);
       const jcalData=ICAL.parse(feeds[i].ics);
       const comp=new ICAL.Component(jcalData);
       const events=comp.getAllSubcomponents("vevent").map(e=>new ICAL.Event(e));
+      console.debug(`Feed [${i}] "${feeds[i].name}" has ${events.length} events`);
 
       events.forEach(ev=>{
+        console.debug('Event:', ev.summary, ev.startDate.toJSDate(), ev.endDate.toJSDate());
         const start=toGMT8(ev.startDate);
         const end=toGMT8(ev.endDate);
         if(start.toDateString()!==currentDate.toDateString()) return;
-        let index=findSlotIndex(start,slots);
-        const endIndex=findSlotIndex(end,slots);
-        if(index<0) index=0;
-        for(let s=index;s<=endIndex && s<slots.length;s++){
-          tableData[s][i].push({ summary: ev.summary, start, end });
+        for (let s = 0; s < slots.length; s++) {
+          // Get slot start and end times
+          const [slotHour, slotMinute] = slots[s].split(":").map(Number);
+          const slotStart = new Date(currentDate);
+          slotStart.setHours(slotHour, slotMinute, 0, 0);
+        
+          let slotEnd;
+          if (s < slots.length - 1) {
+            const [nextHour, nextMinute] = slots[s + 1].split(":").map(Number);
+            slotEnd = new Date(currentDate);
+            slotEnd.setHours(nextHour, nextMinute, 0, 0);
+          } else {
+            // Last slot ends at closing time minus 1 hour
+            const hours = getHoursForDate(currentDate);
+            slotEnd = new Date(currentDate);
+            slotEnd.setHours(hours.end - 1, 0, 0, 0);
+          }
+        
+          // If event overlaps with this slot, add it
+          if (start < slotEnd && end > slotStart) {
+            tableData[s][i].push({ summary: ev.summary, start, end });
+          }
         }
       });
-    }catch(e){ console.error(e); for(let row of tableData) row[i]=[{ summary:"Error" }]; }
+    }catch(e){
+      console.error(`Error parsing feed [${i}] "${feeds[i].name}":`, e);
+      for(let row of tableData) row[i]=[{ summary:"Error" }];
+    }
   }
 
   let html=`<tr><th>Time</th>`;
@@ -217,8 +225,15 @@ async function buildCalendar() {
     const slotTime=new Date(currentDate);
     slotTime.setHours(slotHour,slotMinute,0,0);
 
-    const timeLabel=slotTime.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
-    html+=`<tr><td class="timeCell">${timeLabel}</td>`;
+    const timeLabel = slotTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+
+    // Highlight if this slot is the current time
+    const now = new Date();
+    const isCurrent =
+      slotTime.getHours() === now.getHours() &&
+      slotTime.toDateString() === now.toDateString();
+
+    html += `<tr><td class="timeCell${isCurrent ? " currentTimeCell" : ""}">${timeLabel}</td>`;
 
     for(let c=0;c<feeds.length;c++){
       if(rendered[c]>0){ rendered[c]--; continue; }
@@ -258,16 +273,23 @@ async function buildCalendar() {
       }else{
         classes.push("available");
 
-        let nextEventTime=null;
-        for(let k=r+1;k<slots.length;k++){ if(tableData[k][c].length){ nextEventTime=tableData[k][c][0].start; break; } }
+        let nextEventTime = null;
+        for(let k = r + 1; k < slots.length; k++) {
+          if(tableData[k][c].length) {
+            nextEventTime = tableData[k][c][0].start;
+            break;
+          }
+        }
         if(!nextEventTime){ 
-          const hours=getHoursForDate(currentDate);
-          nextEventTime=new Date(currentDate); 
-          nextEventTime.setHours(hours.end,0,0,0);
+          const hours = getHoursForDate(currentDate);
+          nextEventTime = new Date(currentDate);
+          // For the last available slot, end at closing time minus 1 hour
+          nextEventTime.setHours(hours.end - 1, 0, 0, 0);
+          // But if this is the last slot, show the next slot as "Closing" (handled in the extra row)
         }
 
         if(nextEventTime<new Date()) displayText="";
-        else if(slotTime<new Date()) displayText=`Available until ${nextEventTime.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}`;
+        else if(slotTime<new Date()) displayText=`Available until<br>${nextEventTime.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}`;
         else displayText=`Available<br>${slotTime.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})} - ${nextEventTime.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}`;
       }
 
@@ -275,6 +297,30 @@ async function buildCalendar() {
     }
     html+="</tr>";
   }
+
+  // Add a final row for "Closing" with end time as header
+  const hours = getHoursForDate(currentDate);
+  // Add a row for "Closing" (at closing time minus 1 hour)
+  const closingMinus1 = new Date(currentDate);
+  closingMinus1.setHours(hours.end - 1, 0, 0, 0);
+  const closingMinus1Label = closingMinus1.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+
+  html += `<tr><td class="timeCell">${closingMinus1Label}</td>`;
+  for (let c = 0; c < feeds.length; c++) {
+    html += `<td class="cell unavailable">Studios Closing</td>`;
+  }
+  html += `</tr>`;
+
+  // Add a row for "Closed" (at closing time)
+  const closingTime = new Date(currentDate);
+  closingTime.setHours(hours.end, 0, 0, 0);
+  const closingLabel = closingTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+
+  html += `<tr><td class="timeCell">${closingLabel}</td>`;
+  for (let c = 0; c < feeds.length; c++) {
+    html += `<td class="cell unavailable">Campus Closed</td>`;
+  }
+  html += `</tr>`;
 
   table.innerHTML=html;
 }
