@@ -72,7 +72,6 @@ async function fetchFeedsParallelWithProgress() {
   const progressContainer = document.getElementById("progressContainer");
   progressContainer.classList.add("loading");
   
-  //progressContainer.style.display = "block";
   progress.style.width = "0%";
 
   const indexRes = await fetch(webAppUrl);
@@ -95,7 +94,6 @@ async function fetchFeedsParallelWithProgress() {
   );
 
   await Promise.all(fetchPromises);
-  //progressContainer.style.display="none";
   progressContainer.classList.remove("loading");
   return feedsData;
 }
@@ -156,7 +154,13 @@ function changeDay(delta) {
 
 function clearCalendar() {
   const table = document.getElementById("calendarTable");
-  table.innerHTML=`<tr><td class="loading" colspan="${feeds.length+1}">Loading...</td></tr>`;
+  table.innerHTML = `
+    <table class="calendarTable">
+      <tr>
+        <td class="loading" colspan="99">Loading...</td>
+      </tr>
+    </table>
+  `;
 }
 
 // ---------------- Build Calendar ----------------
@@ -164,32 +168,38 @@ async function buildCalendar() {
   const table = document.getElementById("calendarTable");
   const slots = getTimeSlots();
 
-  if (slots.length===0) {
-    table.innerHTML=`<tr><td colspan="${feeds.length+1}" class="unavailable">Campus Closed</td></tr>`;
+  if (slots.length === 0) {
+    table.innerHTML = `
+      <table class="calendarTable">
+        <tr>
+          <td class="unavailableLarge" colspan="${feeds.length + 1}">Campus Closed</td>
+        </tr>
+      </table>
+    `;
     return;
   }
 
-  const tableData = slots.map(()=>feeds.map(()=>[]));
+  const tableData = slots.map(() => feeds.map(() => []));
 
-  for(let i=0;i<feeds.length;i++){
-    try{
+  for (let i = 0; i < feeds.length; i++) {
+    try {
       console.debug(`Processing feed [${i}]: ${feeds[i].name}`);
-      const jcalData=ICAL.parse(feeds[i].ics);
-      const comp=new ICAL.Component(jcalData);
-      const events=comp.getAllSubcomponents("vevent").map(e=>new ICAL.Event(e));
+      const jcalData = ICAL.parse(feeds[i].ics);
+      const comp = new ICAL.Component(jcalData);
+      const events = comp.getAllSubcomponents("vevent").map(e => new ICAL.Event(e));
       console.debug(`Feed [${i}] "${feeds[i].name}" has ${events.length} events`);
 
-      events.forEach(ev=>{
+      events.forEach(ev => {
         console.debug('Event:', ev.summary, ev.startDate.toJSDate(), ev.endDate.toJSDate());
-        const start=toGMT8(ev.startDate);
-        const end=toGMT8(ev.endDate);
-        if(start.toDateString()!==currentDate.toDateString()) return;
+        const start = toGMT8(ev.startDate);
+        const end = toGMT8(ev.endDate);
+        if (start.toDateString() !== currentDate.toDateString()) return;
         for (let s = 0; s < slots.length; s++) {
           // Get slot start and end times
           const [slotHour, slotMinute] = slots[s].split(":").map(Number);
           const slotStart = new Date(currentDate);
           slotStart.setHours(slotHour, slotMinute, 0, 0);
-        
+
           let slotEnd;
           if (s < slots.length - 1) {
             const [nextHour, nextMinute] = slots[s + 1].split(":").map(Number);
@@ -201,137 +211,152 @@ async function buildCalendar() {
             slotEnd = new Date(currentDate);
             slotEnd.setHours(hours.end - 1, 0, 0, 0);
           }
-        
+
           // If event overlaps with this slot, add it
           if (start < slotEnd && end > slotStart) {
             tableData[s][i].push({ summary: ev.summary, start, end });
           }
         }
       });
-    }catch(e){
+    } catch (e) {
       console.error(`Error parsing feed [${i}] "${feeds[i].name}":`, e);
-      for(let row of tableData) row[i]=[{ summary:"Error" }];
+      for (let row of tableData) row[i] = [{ summary: "Error" }];
     }
   }
 
-  let html=`<tr><th>Time</th>`;
-  feeds.forEach(f=>html+=`<th>${f.name}</th>`);
-  html+=`</tr>`;
+  const feedsPerTable = window.innerWidth < 1280 ? 7 : feeds.length;
+  const tableCount = Math.ceil(feeds.length / feedsPerTable);
 
-  const rendered=Array.from({length:feeds.length},()=>0);
+  let allTablesHtml = "";
 
-  for(let r=0;r<slots.length;r++){
-    const [slotHour,slotMinute]=slots[r].split(":").map(Number);
-    const slotTime=new Date(currentDate);
-    slotTime.setHours(slotHour,slotMinute,0,0);
+  for (let t = 0; t < tableCount; t++) {
+    const feedStart = t * feedsPerTable;
+    const feedEnd = Math.min(feedStart + feedsPerTable, feeds.length);
+    const feedsSlice = feeds.slice(feedStart, feedEnd);
 
-    const timeLabel = slotTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    let html = `<table class="calendarTable" style="margin-bottom:24px;width:100%;" id="calendarTable${t}">`;
+    html += `<tr><th>Time</th>`;
+    feedsSlice.forEach(f => html += `<th>${f.name}</th>`);
+    html += `</tr>`;
 
-    // Highlight if this slot is the current time
-    const now = new Date();
-    const isCurrent =
-      slotTime.getHours() === now.getHours() &&
-      slotTime.toDateString() === now.toDateString();
+    const rendered = Array.from({ length: feedsSlice.length }, () => 0);
 
-    html += `<tr><td class="timeCell${isCurrent ? " currentTimeCell" : ""}">${timeLabel}</td>`;
+    for (let r = 0; r < slots.length; r++) {
+      const [slotHour, slotMinute] = slots[r].split(":").map(Number);
+      const slotTime = new Date(currentDate);
+      slotTime.setHours(slotHour, slotMinute, 0, 0);
 
-    for(let c=0;c<feeds.length;c++){
-      if(rendered[c]>0){ rendered[c]--; continue; }
+      const timeLabel = slotTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+      const now = new Date();
+      const isCurrent =
+        slotTime.getHours() === now.getHours() &&
+        slotTime.toDateString() === now.toDateString();
 
-      const cellEvents=tableData[r][c];
-      let displayText="";
-      let span=1;
+      html += `<tr><td class="timeCell${isCurrent ? " currentTimeCell" : ""}">${timeLabel}</td>`;
 
-      for(let k=r+1;k<slots.length;k++){
-        const nextEvents=tableData[k][c];
-        const nextContent=nextEvents.length?nextEvents[0].summary:"Available";
-        if((cellEvents.length?cellEvents[0].summary:"Available")!==nextContent) break;
-        span++;
-      }
-      rendered[c]=span-1;
+      for (let c = feedStart; c < feedEnd; c++) {
+        const localC = c - feedStart;
+        if (rendered[localC] > 0) { rendered[localC]--; continue; }
 
-      const classes=["cell"];
+        const cellEvents = tableData[r][c];
+        let displayText = "";
+        let span = 1;
 
-      if(cellEvents.length){
-        const ev=cellEvents[0];
-        const evStart=ev.start;
-        const evEnd=ev.end;
+        for (let k = r + 1; k < slots.length; k++) {
+          const nextEvents = tableData[k][c];
+          const nextContent = nextEvents.length ? nextEvents[0].summary : "Available";
+          if ((cellEvents.length ? cellEvents[0].summary : "Available") !== nextContent) break;
+          span++;
+        }
+        rendered[localC] = span - 1;
 
-        const isReservation=ev.summary.includes("Reservation");
-        const isCheckout=ev.summary.includes("Checkout");
-        let isLate=false;
-        if(isReservation) isLate=evStart<new Date(Date.now()-30*60*1000);
-        if(isCheckout) isLate=evEnd<new Date();
+        const classes = ["cell"];
 
-        let label=isReservation?"Reservation":isCheckout?"Checkout":"Booked";
-        if(isReservation) classes.push("reservation");
-        else if(isCheckout) classes.push("checkout");
-        else classes.push("booked");
-        if(isLate){ classes.push("late"); label="Late "+label; }
+        if (cellEvents.length) {
+          const ev = cellEvents[0];
+          const evStart = ev.start;
+          const evEnd = ev.end;
 
-        displayText=`${label}<br>${evStart.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})} - ${evEnd.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}`;
-      }else{
-        classes.push("available");
+          const isReservation = ev.summary.includes("Reservation");
+          const isCheckout = ev.summary.includes("Checkout");
+          let isLate = false;
+          if (isReservation) isLate = evStart < new Date(Date.now() - 30 * 60 * 1000);
+          if (isCheckout) isLate = evEnd < new Date();
 
-        let nextEventTime = null;
-        for(let k = r + 1; k < slots.length; k++) {
-          if(tableData[k][c].length) {
-            nextEventTime = tableData[k][c][0].start;
-            break;
+          let label = isReservation ? "Reservation" : isCheckout ? "Checkout" : "Booked";
+          if (isReservation) classes.push("reservation");
+          else if (isCheckout) classes.push("checkout");
+          else classes.push("booked");
+          if (isLate) { classes.push("late"); label = "Late " + label; }
+
+          displayText = `${label}<br>${evStart.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} - ${evEnd.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+        } else {
+          classes.push("available");
+
+          let nextEventTime = null;
+          for (let k = r + 1; k < slots.length; k++) {
+            if (tableData[k][c].length) {
+              nextEventTime = tableData[k][c][0].start;
+              break;
+            }
           }
-        }
-        if(!nextEventTime){ 
-          const hours = getHoursForDate(currentDate);
-          nextEventTime = new Date(currentDate);
-          // For the last available slot, end at closing time minus 1 hour
-          nextEventTime.setHours(hours.end - 1, 0, 0, 0);
-          // But if this is the last slot, show the next slot as "Closing" (handled in the extra row)
+          if (!nextEventTime) {
+            const hours = getHoursForDate(currentDate);
+            nextEventTime = new Date(currentDate);
+            nextEventTime.setHours(hours.end - 1, 0, 0, 0);
+          }
+
+          if (nextEventTime < new Date()) displayText = "";
+          else if (slotTime < new Date()) displayText = `Available until<br>${nextEventTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+          else displayText = `Available<br>${slotTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} - ${nextEventTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
         }
 
-        if(nextEventTime<new Date()) displayText="";
-        else if(slotTime<new Date()) displayText=`Available until<br>${nextEventTime.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}`;
-        else displayText=`Available<br>${slotTime.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})} - ${nextEventTime.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}`;
+        html += `<td class="${classes.join(" ")}" rowspan="${span}">${displayText}</td>`;
       }
-
-      html+=`<td class="${classes.join(" ")}" rowspan="${span}">${displayText}</td>`;
+      html += "</tr>";
     }
-    html+="</tr>";
+
+    // Add "Closing" and "Closed" rows
+    const hours = getHoursForDate(currentDate);
+    const closingMinus1 = new Date(currentDate);
+    closingMinus1.setHours(hours.end - 1, 0, 0, 0);
+    const closingMinus1Label = closingMinus1.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+
+    html += `<tr><td class="timeCell">${closingMinus1Label}</td>`;
+    for (let c = feedStart; c < feedEnd; c++) {
+      html += `<td class="cell unavailable">Studios Closing</td>`;
+    }
+    html += `</tr>`;
+
+    const closingTime = new Date(currentDate);
+    closingTime.setHours(hours.end, 0, 0, 0);
+    const closingLabel = closingTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+
+    html += `<tr><td class="timeCell">${closingLabel}</td>`;
+    for (let c = feedStart; c < feedEnd; c++) {
+      html += `<td class="cell unavailable">Campus Closed</td>`;
+    }
+    html += `</tr>`;
+
+    html += `</table>`;
+    allTablesHtml += html;
   }
 
-  // Add a final row for "Closing" with end time as header
-  const hours = getHoursForDate(currentDate);
-  // Add a row for "Closing" (at closing time minus 1 hour)
-  const closingMinus1 = new Date(currentDate);
-  closingMinus1.setHours(hours.end - 1, 0, 0, 0);
-  const closingMinus1Label = closingMinus1.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-
-  html += `<tr><td class="timeCell">${closingMinus1Label}</td>`;
-  for (let c = 0; c < feeds.length; c++) {
-    html += `<td class="cell unavailable">Studios Closing</td>`;
-  }
-  html += `</tr>`;
-
-  // Add a row for "Closed" (at closing time)
-  const closingTime = new Date(currentDate);
-  closingTime.setHours(hours.end, 0, 0, 0);
-  const closingLabel = closingTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-
-  html += `<tr><td class="timeCell">${closingLabel}</td>`;
-  for (let c = 0; c < feeds.length; c++) {
-    html += `<td class="cell unavailable">Campus Closed</td>`;
-  }
-  html += `</tr>`;
-
-  table.innerHTML=html;
+  table.innerHTML = allTablesHtml;
 }
 
 function refreshCalendar(){ buildCalendar().catch(err=>console.error(err)); }
 
 // ---------------- Initial Load ----------------
-addNavButtons();
 setHeaderTitle();
+document.body.prepend(document.getElementById("progressContainer")); // Move loading bar to top if not already
+addNavButtons();
 clearCalendar();
 
 fetchFeedsParallelWithProgress()
   .then(data=>{ feeds=data; refreshCalendar(); setInterval(refreshCalendar,60000); })
   .catch(err=>console.error(err));
+
+window.addEventListener("resize", () => {
+  refreshCalendar();
+});
