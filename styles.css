@@ -326,3 +326,18 @@ body {
   background: -webkit-linear-gradient(top, transparent, #333); 
   background: linear-gradient(top, transparent, #333); color:#666;
 }
+
+.calendarTable td.cell.multiple {
+  background: var(--panel);
+  color: var(--eventText);
+  font-size: 1em;
+  padding: 4px 2px;
+  vertical-align: top;
+}
+
+.calendarTable td.cell.multiple div {
+  margin: 2px 0;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-weight: bold;
+}
