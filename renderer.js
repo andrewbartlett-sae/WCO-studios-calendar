@@ -307,7 +307,26 @@ async function buildCalendar() {
             displayText = `${label}<br>${evStart.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} - ${evEnd.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
           } else if (cellEvents.length > 1) {
             classes.push("multiple");
-            displayText = cellEvents.map(ev => {
+            // Show events whose start time falls within this slot's range
+            const slotStart = new Date(currentDate);
+            slotStart.setHours(slotHour, slotMinute, 0, 0);
+
+            let slotEnd;
+            if (r < slots.length - 1) {
+              const [nextHour, nextMinute] = slots[r + 1].split(":").map(Number);
+              slotEnd = new Date(currentDate);
+              slotEnd.setHours(nextHour, nextMinute, 0, 0);
+            } else {
+              const hours = getHoursForDate(currentDate);
+              slotEnd = new Date(currentDate);
+              slotEnd.setHours(hours.end - 1, 0, 0, 0);
+            }
+
+            const eventsToShow = cellEvents.filter(ev =>
+              ev.start >= slotStart && ev.start < slotEnd
+            );
+
+            displayText = eventsToShow.map(ev => {
               const evStart = ev.start;
               const evEnd = ev.end;
               const isReservation = ev.summary.includes("Reservation");
