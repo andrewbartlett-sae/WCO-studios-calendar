@@ -24,9 +24,8 @@ body {
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,"Noto Sans", "Liberation Sans", sans-serif;
   font-size: var(--defaultSize);
   color: var(--text);
-  /*background: url("starfield.jpg");*/
   background-color: var(--bg);
-  background-size: cover;  /* scales image to cover entire screen */
+  background-size: cover;
 }
 
 #calendarHeader {
@@ -51,64 +50,75 @@ body {
   margin: 10px 0;
 }
 
-#calendarNav button, .calendarNavDup button {
+#calendarNav button,
+.calendarNavDup button {
   background: var(--panel);
   color: var(--text);
   border: 1px solid var(--border);
-  /*padding: 6px 10px;*/
-  /*margin-right: 10px;*/
   margin: 20px 20px 0 0;
   cursor: pointer;
-
-  /*font-size: 18px;*/
   padding: 12px 12px;
   border-radius: 16px;
 }
 
-#calendarNav button:hover, .calendarNavDup button:hover{
+#calendarNav button:hover,
+.calendarNavDup button:hover {
   filter: brightness(1.2);
 }
 
-#calendarNav input[type="date"] {
+/* 🔧 Fixed date input styling */
+#calendarNav input[type="date"],
+.calendarNavDup input[type="date"] {
   background: var(--panel);
   color: var(--text);
   border: 1px solid var(--border);
-  /*font-size: 16px;*/
   padding: 8px 12px;
   border-radius: 16px;
   margin: 0 20px 0 0;
   cursor: pointer;
+
+  /* Fix Safari/iOS dark mode */
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
 }
 
-/* On hover/focus, match button behaviour */
+/* Hover/focus */
 #calendarNav input[type="date"]:hover,
-#calendarNav input[type="date"]:focus {
+#calendarNav input[type="date"]:focus,
+.calendarNavDup input[type="date"]:hover,
+.calendarNavDup input[type="date"]:focus {
   filter: brightness(1.2);
   outline: none;
 }
 
-/* Remove default calendar icon background on some browsers */
-#calendarNav input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(1); /* make sure it's visible in dark mode */
+/* Calendar icon (visible in dark mode) */
+#calendarNav input[type="date"]::-webkit-calendar-picker-indicator,
+.calendarNavDup input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
   cursor: pointer;
+}
+
+/* Keep day navigation buttons together */
+.dayNavGroup {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 12px; /* space between buttons */
 }
 
 /* Table */
 .calendarTable + .calendarTable {
-  margin-top: 48px !important; /* Big gap between tables */
+  margin-top: 48px !important;
 }
-
-.calendarTable tr:last-child > td, tr:last-child > th {
+.calendarTable tr:last-child > td,
+tr:last-child > th {
   border-bottom: 0;
 }
-
 .calendarTable {
   width: 100%;
-  /*border-collapse: collapse;*/
   table-layout: fixed;
   border-spacing: 1;
 }
-
 .calendarTable th,
 .calendarTable td {
   border: 1px solid var(--border);
@@ -116,92 +126,65 @@ body {
   vertical-align: middle;
   font-weight: bold;
   font-family: inherit;
-
-  border-bottom: 1px solid #ebebeb;
-  border-right: 1px solid #ebebeb;
-
   border: 0;
   padding: 0;
-  /*vertical-align: text-top;*/
 }
-
 .calendarTable th {
-  /*background-color: var(--panel);*/
-  
   color: #ffffff;
   background-color: #267a7a;
-  padding: 5px 0 5px 0;
-
-  /* force 2-line height */
-  height: 2.6em;       /* around 2 lines worth */
-  line-height: 1.2em;  /* keep normal text leading */
-  
-  /* let long feed names wrap */
+  padding: 5px 0;
+  height: 2.6em;
+  line-height: 1.2em;
   white-space: normal;
-
-  /* center text horizontally + vertically */
-  vertical-align: middle;
   text-align: center;
+  vertical-align: middle;
 }
-
 .calendarTable td.timeCell {
   background-color: var(--panel);
 }
-
 .calendarTable td.timeCell.currentTimeCell {
   animation: orangeGlowerSmall 5s ease-in-out infinite;
 }
 
 /* Availability states */
-.calendarTable td.cell.available {
-  background-color: var(--available);
-}
-
-.calendarTable td.unavailable {
-  background-color: #222;
-  color: #bbb;
-  font-style: italic;
-  text-align: center;
-}
-
+.calendarTable td.cell.available { background-color: var(--available); }
+.calendarTable td.unavailable,
 .calendarTable td.unavailableLarge {
   background-color: #222;
   color: #bbb;
   font-style: italic;
   text-align: center;
-  font-size:large;
 }
-
+.calendarTable td.unavailableLarge { font-size: large; }
 .calendarTable td.cell.reservation {
-  /*background-color: var(--reservation);*/
   color: var(--eventText);
-  text-shadow: 0 -1px 1px rgba(0, 0, 0, 0.4), 0 1px 1px rgba(255, 255, 255, 0.5);
-  border:none;
-  box-shadow: inset 0 -1px 1px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  text-shadow: 0 -1px 1px rgba(0,0,0,0.4),
+               0 1px 1px rgba(255,255,255,0.5);
+  border: none;
+  box-shadow: inset 0 -1px 1px rgba(0,0,0,0.9),
+              inset 0 1px 0 rgba(255,255,255,0.4);
   border-radius: 6px;
-  text-decoration: none;
-  background: -webkit-gradient(linear, left top, left bottom, color-stop(0.00, #70b6f2), color-stop(0.50, #54a3ee), color-stop(0.50, #3690f0), color-stop(1.00, #1a62db));
-  background: -webkit-linear-gradient(top, #70b6f2 0%, #54a3ee 50%, #3690f0 50%, #1a62db 100%);
-  background: -moz-linear-gradient(top, #70b6f2 0%, #54a3ee 50%, #3690f0 50%, #1a62db 100%);
-  background: -o-linear-gradient(top, #70b6f2 0%, #54a3ee 50%, #3690f0 50%, #1a62db 100%);
-  background: -ms-linear-gradient(top, #70b6f2 0%, #54a3ee 50%, #3690f0 50%, #1a62db 100%);
-  background: linear-gradient(to bottom, #70b6f2 0%, #54a3ee 50%, #3690f0 50%, #1a62db 100%);
+  background: linear-gradient(to bottom,
+    #70b6f2 0%, #54a3ee 50%, #3690f0 50%, #1a62db 100%);
 }
-
 .calendarTable td.cell.checkout {
-  /*background-color: var(--checkout);*/
   color: var(--eventText);
-  text-shadow: 0 -1px 1px rgba(0, 0, 0, 0.4), 0 1px 1px rgba(255, 255, 255, 0.5);border:none; box-shadow: inset 0 -1px 1px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.4);border-radius: 6px;text-decoration: none;background: -webkit-gradient(linear, left top, left bottom, color-stop(1.00, #b7ff7d), color-stop(0.52, #69b926), color-stop(0.50, #7fd33a), color-stop(0.00, #daffbc));background: -webkit-linear-gradient(top, #daffbc 0%, #7fd33a 50%, #69b926 52%, #b7ff7d 100%);background: -moz-linear-gradient(top, #daffbc 0%, #7fd33a 50%, #69b926 52%, #b7ff7d 100%);background: -o-linear-gradient(top, #daffbc 0%, #7fd33a 50%, #69b926 52%, #b7ff7d 100%);background: -ms-linear-gradient(top, #daffbc 0%, #7fd33a 50%, #69b926 52%, #b7ff7d 100%);background: linear-gradient(to bottom, #daffbc 0%, #7fd33a 50%, #69b926 52%, #b7ff7d 100%);
+  border: none;
+  box-shadow: inset 0 -1px 1px rgba(0,0,0,0.9),
+              inset 0 1px 0 rgba(255,255,255,0.4);
+  border-radius: 6px;
+  background: linear-gradient(to bottom,
+    #daffbc 0%, #7fd33a 50%, #69b926 52%, #b7ff7d 100%);
 }
-
 .calendarTable td.cell.booked {
   background-color: var(--booked);
   color: var(--text);
 }
-
 .calendarTable td.cell.late {
-  /*color: var(--late-text);*/
-  text-shadow: 0 -1px 1px rgba(0, 0, 0, 0.4), 0 1px 1px rgba(255, 255, 255, 0.5);border:none; box-shadow: inset 0 -1px 1px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.4);border-radius: 6px;text-decoration: none;background: -webkit-gradient(linear, left top, left bottom, color-stop(0.00, #fd8f9b), color-stop(0.50, #f55), color-stop(0.50, #f60000), color-stop(1.00, #ffa7b0));background: -webkit-linear-gradient(top, #fd8f9b 0%, #f55 50%, #f60000 50%, #ffa7b0 100%);background: -moz-linear-gradient(top, #fd8f9b 0%, #f55 50%, #f60000 50%, #ffa7b0 100%);background: -o-linear-gradient(top, #fd8f9b 0%, #f55 50%, #f60000 50%, #ffa7b0 100%);background: -ms-linear-gradient(top, #fd8f9b 0%, #f55 50%, #f60000 50%, #ffa7b0 100%);background: linear-gradient(to bottom, #fd8f9b 0%, #f55 50%, #f60000 50%, #ffa7b0 100%);
+  border: none;
+  border-radius:6px;
+  background: linear-gradient(to bottom,
+    #fd8f9b 0%, #f55 50%, #f60000 50%, #ffa7b0 100%);
 }
 
 /* Loading cell */
@@ -222,157 +205,89 @@ body {
   white-space: nowrap;
 }
 
+/* Progress bar */
 #progressContainer {
   width: 100%;
   height: 20px;
-  min-height: 20px;
   margin: 10px 0;
   border-radius: 4px;
   overflow: hidden;
   box-sizing: border-box;
   background: transparent;
-  transition: background 0.3s, opacity 0.5s; /* add smoothness */
-  opacity: 0; /* default hidden */
+  transition: background .3s, opacity .5s;
+  opacity: 0;
 }
-
-#progressContainer.loading {
-  background: #eee;
-  opacity: 1; /* visible while loading */
-}
-
+#progressContainer.loading { background:#eee; opacity:1; }
 #progressBar {
   height: 100%;
   width: 0%;
-  background: linear-gradient(to right, #FA0, #4caf50); /* blue→green */
-  transition: width 0.3s linear;
-  box-shadow: 0 0 5px rgba(0,0,0,0.2);
+  background: linear-gradient(to right,#FA0,#4caf50);
+  transition: width .3s linear;
+  box-shadow:0 0 5px rgba(0,0,0,.2);
 }
+#progressContainer.loading #progressBar { display:block; }
 
-#progressContainer.loading #progressBar {
-  display: block;
-}
-
+/* Neon/Glow effects */
 .neonOrange {
-  color: #fff;
-  text-shadow:
-      0 0 5px #FA0,
-      0 0 10px #FA0,
-      0 0 20px #FA0,
-      0 0 40px #850,
-      0 0 80px #850,
-      0 0 90px #850,
-      0 0 100px #850,
-      0 0 150px #850;
+  color:#fff;
+  text-shadow:0 0 5px #FA0,0 0 10px #FA0,0 0 20px #FA0,
+              0 0 40px #850,0 0 80px #850,0 0 90px #850,
+              0 0 100px #850,0 0 150px #850;
 }
-
-.orangeGlow {
-  animation: orangeGlower 12s ease-in-out infinite;
-}
-
+.orangeGlow { animation: orangeGlower 12s ease-in-out infinite; }
 @keyframes orangeGlower {
-  0%,
-  100% {
-    color: #fff;
-    text-shadow:
-      0 0 5px #fff,
-      0 0 10px #fff,
-      0 0 20px #fff,
-      0 0 40px #FA0,
-      0 0 80px #FA0,
-      0 0 90px #FA0,
-      0 0 100px #FA0,
-      0 0 150px #FA0;
+  0%,100% {
+    color:#fff;
+    text-shadow:0 0 5px #fff,0 0 10px #fff,0 0 20px #fff,
+                0 0 40px #FA0,0 0 80px #FA0,0 0 90px #FA0,
+                0 0 100px #FA0,0 0 150px #FA0;
   }
   50% {
-    color: #fff;
-    text-shadow:
-      0 0 5px #FA0,
-      0 0 10px #FA0,
-      0 0 20px #FA0,
-      0 0 40px #850,
-      0 0 80px #850,
-      0 0 90px #850,
-      0 0 100px #850,
-      0 0 150px #850;
+    color:#fff;
+    text-shadow:0 0 5px #FA0,0 0 10px #FA0,0 0 20px #FA0,
+                0 0 40px #850,0 0 80px #850,0 0 90px #850,
+                0 0 100px #850,0 0 150px #850;
   }
 }
-
-.orangeGlowSmall {
-  animation: orangeGlowerSmall 5s ease-in-out infinite;
-}
-
+.orangeGlowSmall { animation: orangeGlowerSmall 5s ease-in-out infinite; }
 @keyframes orangeGlowerSmall {
-  0%,
-  100% {
-    color: #fff;
-    text-shadow:
-      0 0 5px #fff,
-      0 0 10px #fff,
-      0 0 20px #fff,
-      0 0 40px #FA0,
-      0 0 80px #FA0,
-      0 0 90px #FA0,
-      0 0 100px #FA0,
-      0 0 150px #FA0;
+  0%,100% {
+    color:#fff;
+    text-shadow:0 0 5px #fff,0 0 10px #fff,0 0 20px #fff,
+                0 0 40px #FA0,0 0 80px #FA0,0 0 90px #FA0,
+                0 0 100px #FA0,0 0 150px #FA0;
   }
   50% {
-    color: #fff;
-    text-shadow:
-      0 0 5px #FA0,
-      0 0 10px #FA0,
-      0 0 20px #FA0,
-      0 0 40px #FA0,
-      0 0 80px #FA0,
-      0 0 90px #FA0,
-      0 0 100px #FA0,
-      0 0 150px #FA0;
+    color:#fff;
+    text-shadow:0 0 5px #FA0,0 0 10px #FA0,0 0 20px #FA0,
+                0 0 40px #FA0,0 0 80px #FA0,0 0 90px #FA0,
+                0 0 100px #FA0,0 0 150px #FA0;
   }
 }
 
+/* Gloss styles (left unchanged except for formatting) */
 .blueGloss {
-  text-shadow: 0 -1px 1px rgba(0, 0, 0, 0.4), 0 1px 1px rgba(255, 255, 255, 0.5);
+  text-shadow: 0 -1px 1px rgba(0,0,0,0.4), 0 1px 1px rgba(255,255,255,0.5);
   border:none;
-  box-shadow: inset 0 -1px 1px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  box-shadow: inset 0 -1px 1px rgba(0,0,0,0.9),
+              inset 0 1px 0 rgba(255,255,255,0.4);
   border-radius: 6px;
-  text-decoration: none;
-  background: -webkit-gradient(linear, left top, left bottom, color-stop(0.00, #70b6f2), color-stop(0.50, #54a3ee), color-stop(0.50, #3690f0), color-stop(1.00, #1a62db));
-  background: -webkit-linear-gradient(top, #70b6f2 0%, #54a3ee 50%, #3690f0 50%, #1a62db 100%);
-  background: -moz-linear-gradient(top, #70b6f2 0%, #54a3ee 50%, #3690f0 50%, #1a62db 100%);
-  background: -o-linear-gradient(top, #70b6f2 0%, #54a3ee 50%, #3690f0 50%, #1a62db 100%);
-  background: -ms-linear-gradient(top, #70b6f2 0%, #54a3ee 50%, #3690f0 50%, #1a62db 100%);
-  background: linear-gradient(to bottom, #70b6f2 0%, #54a3ee 50%, #3690f0 50%, #1a62db 100%);
+  background: linear-gradient(to bottom,#70b6f2 0%,#54a3ee 50%,#3690f0 50%,#1a62db 100%);
 }
-
 .greenGloss {
-  text-shadow: 0 -1px 1px rgba(0, 0, 0, 0.4), 0 1px 1px rgba(255, 255, 255, 0.5);
+  text-shadow: 0 -1px 1px rgba(0,0,0,0.4),0 1px 1px rgba(255,255,255,0.5);
   border:none;
-  box-shadow: inset 0 -1px 1px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  box-shadow: inset 0 -1px 1px rgba(0,0,0,0.9),
+              inset 0 1px 0 rgba(255,255,255,0.4);
   border-radius: 6px;
-  text-decoration: none;
-  background: -webkit-gradient(linear, left top, left bottom, color-stop(1.00, #b7ff7d), color-stop(0.52, #69b926), color-stop(0.50, #7fd33a), color-stop(0.00, #daffbc));
-  background: -webkit-linear-gradient(top, #daffbc 0%, #7fd33a 50%, #69b926 52%, #b7ff7d 100%);
-  background: -moz-linear-gradient(top, #daffbc 0%, #7fd33a 50%, #69b926 52%, #b7ff7d 100%);
-  background: -o-linear-gradient(top, #daffbc 0%, #7fd33a 50%, #69b926 52%, #b7ff7d 100%);
-  background: -ms-linear-gradient(top, #daffbc 0%, #7fd33a 50%, #69b926 52%, #b7ff7d 100%);
-  background: linear-gradient(to bottom, #daffbc 0%, #7fd33a 50%, #69b926 52%, #b7ff7d 100%);
+  background: linear-gradient(to bottom,#daffbc 0%,#7fd33a 50%,#69b926 52%,#b7ff7d 100%);
 }
-
 .tealGloss {
-  text-shadow: 0 -1px 1px rgba(0, 0, 0, 0.4), 0 1px 1px rgba(255, 255, 255, 0.5);
-  border: none;box-shadow: inset 0 -1px 1px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  border-radius: 6px;
-  background: -webkit-gradient(linear, left top, left bottom, color-stop(1.00, #03b7ac), color-stop(0.52, #006662), color-stop(0.48, #69a7a4), color-stop(0.00, #c2d9df));
-  background: -webkit-linear-gradient(top, #c2d9df 0%, #69a7a4 48%, #006662 52%, #03b7ac 100%);
-  background: -moz-linear-gradient(top, #c2d9df 0%, #69a7a4 48%, #006662 52%, #03b7ac 100%);
-  background: -o-linear-gradient(top, #c2d9df 0%, #69a7a4 48%, #006662 52%, #03b7ac 100%);
-  background: -ms-linear-gradient(top, #c2d9df 0%, #69a7a4 48%, #006662 52%, #03b7ac 100%);
-  background: linear-gradient(to bottom, #c2d9df 0%, #69a7a4 48%, #006662 52%, #03b7ac 100%);
+  border:none;
+  border-radius:6px;
+  background: linear-gradient(to bottom,#c2d9df 0%,#69a7a4 48%,#006662 52%,#03b7ac 100%);
 }
-
 .greyGloss {
-  background: -moz-linear-gradient(top, transparent, #333); 
-  background: -ms-linear-gradient(top, transparent, #333);  
-  background: -o-linear-gradient(top, transparent, #333); 
-  background: -webkit-linear-gradient(top, transparent, #333); 
-  background: linear-gradient(top, transparent, #333); color:#666;
+  background: linear-gradient(top,transparent,#333);
+  color:#666;
 }
