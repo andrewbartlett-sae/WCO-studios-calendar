@@ -122,7 +122,7 @@ async function fetchFeedsParallelWithProgress() {
 function setHeaderTitle() {
   let header = document.getElementById("calendarHeader");
   if (!header) {
-    header = document.createElement("h1");
+    header = document.createElement("h2");
     header.id = "calendarHeader";
     document.body.prepend(header);
 
@@ -137,10 +137,7 @@ function setHeaderTitle() {
     month: "long",
     year: "numeric",
   };
-  header.textContent = `Studio Availability – ${currentDate.toLocaleDateString(
-    "en-GB",
-    options
-  )}`;
+  header.innerHTML = `Studio Availability<br>${currentDate.toLocaleDateString("en-GB", options)}`;
 
   // Add/remove currentDate class
   const today = new Date();
