@@ -505,6 +505,15 @@ fetchFeedsParallelWithProgress().then(data=>{
 }).catch(console.error);
 
 window.addEventListener("resize",()=>refreshCalendar());
+window.addEventListener("keydown", function(e) {
+  if (e.key === "ArrowLeft") {
+    changeDay(-1);
+    e.preventDefault();
+  } else if (e.key === "ArrowRight") {
+    changeDay(1);
+    e.preventDefault();
+  }
+});
 
 // expose for inline duplicate navs
 window.changeDay=changeDay;
