@@ -29,6 +29,6 @@ export const weekTypeRanges = [
 
 export const singleDayOverrides = [
   { date: "2025-08-21", hours: { start: 8, end: 12 } }, //Early close Showcase
-  { date: "2026-05-26", hours: null }, //Australia Day
+  { date: "2026-01-26", hours: null }, //Australia Day
   /*{ date: "2025-08-24", hours: { start: 6, end: 23 }  },//Test day*/
 ];
