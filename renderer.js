@@ -1,16 +1,18 @@
 import { weekTypes, weekTypeRanges, singleDayOverrides } from "./calendarConfig.js";
 
 // ---------------- URLs ----------------
-const webAppUrl = "https://script.google.com/macros/s/AKfycbzwcZ7wgnhWfqhfM6CxhdYK7MGbDlJy_l5ZLtna0MK9pxN1KjnN32ZAFiviaFW3kQI/exec";
+const webAppUrl = "https://script.google.com/macros/s/AKfycbxcb7lxSS6CvmhXfqNFku5wxxu-2JVk5xiKgNAHxXc5AAVdYeYhvkjDRhND-n49z0sj/exec";
 
 let feeds = [];
 let currentDate = new Date();
-const version = "v1.0";
+const version = "v1.9";
+
+const columnWidthThreshold = 80;//pixels
 
 // ---------------- Availability Helper ----------------
 function getHoursForDate(date) {
   const isoDate = date.toISOString().split("T")[0];
-  const override = singleDayOverrides.find(o => o.date === isoDate);
+  const override = singleDayOverrides.find((o) => o.date === isoDate);
   if (override) return override.hours;
 
   for (const range of weekTypeRanges) {
@@ -24,77 +26,96 @@ function getHoursForDate(date) {
   return weekTypes.Default[date.getDay()] || null;
 }
 
-function getTimeSlots() {
-  const hours = getHoursForDate(currentDate);
-  if (!hours) return [];
-  const slots = [];
-  // First slot is 8:10 (or whatever the start hour is)
-  slots.push(`${String(hours.start).padStart(2,"0")}:10`);
-  // The rest are on the hour, up to the hour before closing - 2
-  for (let h = hours.start + 1; h < hours.end - 2; h++) {
-    slots.push(`${String(h).padStart(2,"0")}:00`);
-  }
-  // Add the last slot, which is closing time minus 2 hours
-  if (hours.end - 2 >= hours.start) {
-    slots.push(`${String(hours.end - 2).padStart(2,"0")}:00`);
-  }
-  return slots;
-}
-
-function getTimeSlots_old() {
-  const hours = getHoursForDate(currentDate);
-  if (!hours) return [];
-  const slots = [];
-  for (let h = hours.start; h <= hours.end; h++) {
-    slots.push(`${String(h).padStart(2,"0")}:00`);
-    if (h < hours.end) slots.push(`${String(h).padStart(2,"0")}:30`);
-  }
-  return slots;
-}
-
 function toGMT8(icalTime) {
   const d = icalTime.toJSDate();
-  const utcTime = d.getTime() + d.getTimezoneOffset()*60000;
-  return new Date(utcTime + 8*60*60*1000);
-}
-
-function findSlotIndex(date, slots) {
-  const h = date.getHours();
-  const m = date.getMinutes();
-  const slotStr = `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
-  return slots.indexOf(slotStr);
+  const utcTime = d.getTime() + d.getTimezoneOffset() * 60000;
+  return new Date(utcTime + 8 * 60 * 60 * 1000);
 }
 
 // ---------------- Fetch Feeds ----------------
+let currentFetchController = null; // track active fetch batch
+let activeFetchId = 0;             // unique ID for each batch
+
 async function fetchFeedsParallelWithProgress() {
+  // Cancel previous batch if running
+  if (currentFetchController) {
+    currentFetchController.abort();
+  }
+
+  currentFetchController = new AbortController();
+  const signal = currentFetchController.signal;
+  const fetchId = ++activeFetchId;
+
   const progress = document.getElementById("progressBar");
   const progressContainer = document.getElementById("progressContainer");
+
+  // Start fresh loading state
   progressContainer.classList.add("loading");
-  
   progress.style.width = "0%";
 
-  const indexRes = await fetch(webAppUrl);
-  if (!indexRes.ok) throw new Error("Failed to fetch feed index");
-  const feedIndex = await indexRes.json();
+  try {
+    // Get the feed index (list of all feeds + names)
+    const indexRes = await fetch(webAppUrl, { signal });
+    if (!indexRes.ok) throw new Error("Failed to fetch feed index");
+    const feedIndex = await indexRes.json();
 
-  const totalSteps = feedIndex.length + 1;
-  let completed = 1;
-  progress.style.width = ((completed/totalSteps)*100) + "%";
+    const totalSteps = feedIndex.length + 1;
+    let completed = 1;
+    progress.style.width = (completed / totalSteps) * 100 + "%";
 
-  const feedUrls = feedIndex.map((feed,i)=>`${webAppUrl}?feed=${i}`);
-  const feedsData = new Array(feedUrls.length);
+    const feedUrls = feedIndex.map((feed, i) => `${webAppUrl}?feed=${i}`);
+    const feedsData = new Array(feedUrls.length);
 
-  const fetchPromises = feedUrls.map((url,i) =>
-    fetch(url)
-      .then(res=>res.ok?res.json():Promise.reject(`Failed feed ${i}`))
-      .then(data=>{ feedsData[i]=data; })
-      .catch(err=>{ console.error(err); feedsData[i]={ name: feedIndex[i].name, ics:"" }; })
-      .finally(()=>{ completed++; progress.style.width=((completed/totalSteps)*100)+"%"; })
-  );
+    const fetchPromises = feedUrls.map((url, i) =>
+      fetch(url, { signal })
+        .then(res => (res.ok ? res.json() : Promise.reject(`Failed feed ${i}`)))
+        .then(data => { feedsData[i] = data; })
+        .catch(err => {
+          if (err.name === "AbortError") {
+            console.log(`⏹️ Aborted fetch for feed "${feedIndex[i].name}" (expected)`);
+            return;
+          }
+          console.error(`❌ Error fetching feed "${feedIndex[i].name}"`, err);
+          feedsData[i] = { name: feedIndex[i].name, ics: "" };
+        })
+        .finally(() => {
+          if (!signal.aborted && fetchId === activeFetchId) {
+            completed++;
+            progress.style.width = (completed / totalSteps) * 100 + "%";
+          }
+        })
+    );
 
-  await Promise.all(fetchPromises);
-  progressContainer.classList.remove("loading");
-  return feedsData;
+    await Promise.all(fetchPromises);
+
+    if (!signal.aborted && fetchId === activeFetchId) {
+      // ✅ Progress bar finishes smoothly
+      progress.style.width = "100%";
+      setTimeout(() => {
+        progressContainer.classList.remove("loading");
+        // Reset width after fade-out ends
+        setTimeout(() => { progress.style.width = "0%"; }, 500);
+      }, 300);
+
+      return feedsData; // 🔥 return valid data
+    } else {
+      console.log("⏹️ Fetch batch aborted (expected)");
+      return; // ❌ don’t overwrite feeds on abort
+    }
+
+  } catch (err) {
+    if (err.name === "AbortError" || err.message === "Fetch aborted") {
+      console.log("⏹️ Fetch batch aborted (expected)");
+    } else {
+      console.error("❌ Fetch failed:", err);
+    }
+
+    if (fetchId === activeFetchId) {
+      progress.style.width = "0%";
+      progressContainer.classList.remove("loading");
+    }
+    return; // ❌ don't overwrite feeds on error
+  }
 }
 
 // ---------------- Calendar UI ----------------
@@ -102,50 +123,104 @@ function setHeaderTitle() {
   let header = document.getElementById("calendarHeader");
   if (!header) {
     header = document.createElement("h1");
-    header.id="calendarHeader";
-    header.classList.add("neonOrange");
+    header.id = "calendarHeader";
     document.body.prepend(header);
 
     const versionTag = document.createElement("div");
-    versionTag.id="calendarVersion";
-    versionTag.textContent=version;
+    versionTag.id = "calendarVersion";
+    versionTag.textContent = version;
     document.body.insertBefore(versionTag, header.nextSibling);
   }
-  const options={ weekday:"long", day:"numeric", month:"long", year:"numeric" };
-  header.textContent=`Studio Availability – ${currentDate.toLocaleDateString("en-GB", options)}`;
+  const options = {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  };
+  header.textContent = `Studio Availability – ${currentDate.toLocaleDateString(
+    "en-GB",
+    options
+  )}`;
+
+  // Add/remove currentDate class
+  const today = new Date();
+  if (
+    currentDate.getFullYear() === today.getFullYear() &&
+    currentDate.getMonth() === today.getMonth() &&
+    currentDate.getDate() === today.getDate()
+  ) {
+    header.classList.add("neonOrange");
+  } else {
+    header.classList.remove("neonOrange");
+  }
 }
 
 function addNavButtons() {
   let nav = document.getElementById("calendarNav");
   if (!nav) {
-    nav=document.createElement("div");
-    nav.id="calendarNav";
+    nav = document.createElement("div");
+    nav.id = "calendarNav";
     document.body.prepend(nav);
 
-    const prevBtn=document.createElement("button");
-    prevBtn.textContent="← Previous Day";
-    prevBtn.onclick=()=>changeDay(-1);
+    /*const weekBackBtn = document.createElement("button");
+    weekBackBtn.textContent = "« Previous Week";
+    weekBackBtn.onclick = () => changeDay(-7);
+    nav.appendChild(weekBackBtn);*/
+
+    const prevBtn = document.createElement("button");
+    prevBtn.textContent = "← Previous Day";
+    prevBtn.onclick = () => changeDay(-1);
     nav.appendChild(prevBtn);
 
-    const todayBtn=document.createElement("button");
-    todayBtn.textContent="Today";
-    todayBtn.onclick=()=>{ currentDate=new Date(); clearCalendar(); setHeaderTitle(); refreshCalendar(); };
+    const todayBtn = document.createElement("button");
+    todayBtn.textContent = "Today";
+    todayBtn.onclick = () => {
+      currentDate = new Date();
+      clearCalendar();
+      setHeaderTitle();
+      refreshCalendar();
+    };
     nav.appendChild(todayBtn);
 
-    const refreshBtn=document.createElement("button");
-    refreshBtn.textContent="Refresh";
-    refreshBtn.onclick=async()=>{ feeds=await fetchFeedsParallelWithProgress(); refreshCalendar(); };
-    nav.appendChild(refreshBtn);
-
-    const nextBtn=document.createElement("button");
-    nextBtn.textContent="Next Day →";
-    nextBtn.onclick=()=>changeDay(1);
+    const nextBtn = document.createElement("button");
+    nextBtn.textContent = "Next Day →";
+    nextBtn.onclick = () => changeDay(1);
     nav.appendChild(nextBtn);
+
+    /*const weekForwardBtn = document.createElement("button");
+    weekForwardBtn.textContent = "Next Week »";
+    weekForwardBtn.onclick = () => changeDay(7);
+    nav.appendChild(weekForwardBtn);*/
+
+    const dateInput = document.createElement("input");
+    dateInput.type = "date";
+    dateInput.style.marginLeft = "10px";
+    dateInput.onchange = () => {
+      const selectedDate = new Date(dateInput.value);
+      if (!isNaN(selectedDate)) {
+        currentDate = selectedDate;
+        clearCalendar();
+        setHeaderTitle();
+        refreshCalendar();
+      }
+    };
+    nav.appendChild(dateInput);
+
+    const refreshBtn = document.createElement("button");
+    refreshBtn.textContent = "Refresh";
+    refreshBtn.onclick = async () => {
+      const data = await fetchFeedsParallelWithProgress();
+      if (data) {  // ✅ only replace feeds if valid array returned
+        feeds = data;
+        refreshCalendar();
+      }
+};
+    nav.appendChild(refreshBtn);
   }
 }
 
 function changeDay(delta) {
-  currentDate.setDate(currentDate.getDate()+delta);
+  currentDate.setDate(currentDate.getDate() + delta);
   clearCalendar();
   setHeaderTitle();
   refreshCalendar();
@@ -162,253 +237,285 @@ function clearCalendar() {
   `;
 }
 
-// ---------------- Build Calendar ----------------
-async function buildCalendar() {
-  const table = document.getElementById("calendarTable");
-  const slots = getTimeSlots();
+// ---------------- Timeline Builder ----------------
+function buildAccurateTimeline(feeds, currentDate) {
+  const hours = getHoursForDate(currentDate);
+  if (!hours) return [];
 
-  if (slots.length === 0) {
-    table.innerHTML = `
-      <table class="calendarTable">
-        <tr>
-          <td class="unavailableLarge" colspan="${feeds.length + 1}">Campus Closed</td>
-        </tr>
-      </table>
-    `;
-    return;
-  }
+  const startOfDay = new Date(currentDate);
+  startOfDay.setHours(hours.start, 0, 0, 0);
 
-  const tableData = slots.map(() => feeds.map(() => []));
+  const endOfDay = new Date(currentDate);
+  endOfDay.setHours(hours.end, 0, 0, 0);
+
+  const bookableEnd = new Date(currentDate);
+  bookableEnd.setHours(hours.end - 1, 0, 0, 0); // closing-1h
+
+  const timelines = [];
 
   for (let i = 0; i < feeds.length; i++) {
     try {
-      console.debug(`Processing feed [${i}]: ${feeds[i].name}`);
       const jcalData = ICAL.parse(feeds[i].ics);
       const comp = new ICAL.Component(jcalData);
       const events = comp.getAllSubcomponents("vevent").map(e => new ICAL.Event(e));
-      console.debug(`Feed [${i}] "${feeds[i].name}" has ${events.length} events`);
 
-      events.forEach(ev => {
-        console.debug('Event:', ev.summary, ev.startDate.toJSDate(), ev.endDate.toJSDate());
-        const start = toGMT8(ev.startDate);
-        const end = toGMT8(ev.endDate);
-        if (start.toDateString() !== currentDate.toDateString()) return;
-        for (let s = 0; s < slots.length; s++) {
-          // Get slot start and end times
-          const [slotHour, slotMinute] = slots[s].split(":").map(Number);
-          const slotStart = new Date(currentDate);
-          slotStart.setHours(slotHour, slotMinute, 0, 0);
+      // 🟢 Keep any event that overlaps today at all
+      const todaysEvents = events
+        .map(ev => ({
+          summary: ev.summary,
+          start: toGMT8(ev.startDate),
+          end: toGMT8(ev.endDate),
+        }))
+        .filter(ev => ev.start < endOfDay && ev.end > startOfDay)
+        .sort((a, b) => a.start - b.start);
 
-          let slotEnd;
-          if (s < slots.length - 1) {
-            const [nextHour, nextMinute] = slots[s + 1].split(":").map(Number);
-            slotEnd = new Date(currentDate);
-            slotEnd.setHours(nextHour, nextMinute, 0, 0);
-          } else {
-            // Last slot ends at closing time minus 1 hour
-            const hours = getHoursForDate(currentDate);
-            slotEnd = new Date(currentDate);
-            slotEnd.setHours(hours.end - 1, 0, 0, 0);
-          }
+      // If no events, just one availability block
+      if (todaysEvents.length === 0) {
+        timelines[i] = [{
+          type: "available",
+          start: startOfDay,
+          end: bookableEnd
+        }];
+        continue;
+      }
 
-          // If event overlaps with this slot, add it
-          if (start < slotEnd && end > slotStart) {
-            tableData[s][i].push({ summary: ev.summary, start, end });
-          }
+      let timeline = [];
+      let cursor = startOfDay;
+
+      todaysEvents.forEach(ev => {
+        // Clip event time to today’s window
+        const evStart = ev.start < startOfDay ? startOfDay : ev.start;
+        const evEnd = ev.end > bookableEnd ? bookableEnd : ev.end;
+
+        if (evStart > cursor) {
+          timeline.push({
+            type: "available",
+            start: new Date(cursor),
+            end: new Date(evStart)
+          });
         }
+
+        let type = "booked";
+        if (ev.summary.includes("Reservation")) type = "reservation";
+        else if (ev.summary.includes("Checkout")) type = "checkout";
+        timeline.push({ type, start: evStart, end: evEnd });
+
+        cursor = new Date(Math.max(cursor, evEnd));
       });
+
+      if (cursor < bookableEnd) {
+        timeline.push({
+          type: "available",
+          start: new Date(cursor),
+          end: bookableEnd
+        });
+      }
+
+      timelines[i] = timeline;
+
     } catch (e) {
       console.error(`Error parsing feed [${i}] "${feeds[i].name}":`, e);
-      for (let row of tableData) row[i] = [{ summary: "Error" }];
+      timelines[i] = [{ type: "error" }];
+    }
+  }
+  return timelines;
+}
+
+// ---------------- Responsive Feed Split ----------------
+function calculateFeedsPerTable() {
+  const textMeasure = document.createElement("span");
+  textMeasure.style.visibility = "hidden";
+  textMeasure.style.whiteSpace = "nowrap";
+  textMeasure.textContent = "Reservation";
+  document.body.appendChild(textMeasure);
+  const minColWidth = Math.max(columnWidthThreshold, textMeasure.getBoundingClientRect().width + 20);
+  document.body.removeChild(textMeasure);
+
+  const availableWidth = window.innerWidth - 40;
+  const maxCols = Math.floor(availableWidth / minColWidth);
+
+  return Math.max(1, (maxCols - 1) || 1);
+}
+
+// ---------------- Table Renderer ----------------
+function renderCalendarTable(feeds, timelines) {
+  if (feeds.length === 0) return "";
+
+  const breakpoints = new Set();
+
+  timelines.forEach(tl =>
+    tl.forEach(seg => {
+      if (seg.start && seg.end) {
+        breakpoints.add(seg.start.getTime());
+        breakpoints.add(seg.end.getTime());
+      }
+    })
+  );
+
+  const hours = getHoursForDate(currentDate);
+  if (hours) {
+    for (let h = hours.start; h < hours.end - 1; h++) {
+      const anchor = new Date(currentDate);
+      anchor.setHours(h, 0, 0, 0);
+      breakpoints.add(anchor.getTime());
     }
   }
 
-  const feedsPerTable = window.innerWidth < 1280 ? 7 : feeds.length;
-  const tableCount = Math.ceil(feeds.length / feedsPerTable);
+  const sortedBreaks = Array.from(breakpoints).sort((a, b) => a - b).map(t => new Date(t));
 
-  let allTablesHtml = "";
+  if (sortedBreaks.length === 0) {
+    return `<table class="calendarTable"><tr><td class="unavailableLarge" colspan="${feeds.length + 1}">Campus Closed</td></tr></table>`;
+  }
 
-  for (let t = 0; t < tableCount; t++) {
-    const feedStart = t * feedsPerTable;
-    const feedEnd = Math.min(feedStart + feedsPerTable, feeds.length);
-    const feedsSlice = feeds.slice(feedStart, feedEnd);
+  let html = `<table class="calendarTable"><tr><th>Time</th>${feeds.map(f => `<th>${f.name}</th>`).join("")}</tr>`;
 
-    let html = `<table class="calendarTable" style="margin-bottom:24px;width:100%;" id="calendarTable${t}">`;
-    html += `<tr><th>Time</th>`;
-    feedsSlice.forEach(f => html += `<th>${f.name}</th>`);
-    html += `</tr>`;
+  const rowspanRemaining = Array(feeds.length).fill(0);
+  const now = new Date();
 
-    const rendered = Array.from({ length: feedsSlice.length }, () => 0);
+  for (let i = 0; i < sortedBreaks.length - 1; i++) {
+    const rowStart = sortedBreaks[i];
+    const rowEnd = sortedBreaks[i + 1];
+    const timeLabel = rowStart.toLocaleTimeString("en-US", { hour:"numeric", minute:"2-digit", hour12:true });
+    const isCurrent = rowStart <= now && rowEnd > now && rowStart.toDateString() === now.toDateString();
 
-    for (let r = 0; r < slots.length; r++) {
-      const [slotHour, slotMinute] = slots[r].split(":").map(Number);
-      const slotTime = new Date(currentDate);
-      slotTime.setHours(slotHour, slotMinute, 0, 0);
+    html += `<tr><td class="timeCell${isCurrent ? " currentTimeCell" : ""}">${timeLabel}</td>`;
 
-      const timeLabel = slotTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-      const now = new Date();
-      const isCurrent =
-        slotTime.getHours() === now.getHours() &&
-        slotTime.toDateString() === now.toDateString();
+    feeds.forEach((f, idx) => {
+      if (rowspanRemaining[idx] > 0) { rowspanRemaining[idx]--; return; }
 
-      html += `<tr><td class="timeCell${isCurrent ? " currentTimeCell" : ""}">${timeLabel}</td>`;
+      const seg = timelines[idx].find(s => s.start <= rowStart && s.end >= rowEnd);
+      if (!seg) { html += `<td class="cell unavailable"></td>`; return; }
 
-      for (let c = feedStart; c < feedEnd; c++) {
-        const localC = c - feedStart;
-        if (rendered[localC] > 0) { rendered[localC]--; continue; }
-
-        const cellEvents = tableData[r][c];
-        let displayText = "";
-        let span = 1;
-
-        for (let k = r + 1; k < slots.length; k++) {
-          const nextEvents = tableData[k][c];
-
-          // Compare all events in both slots
-          const eventsMatch =
-            cellEvents.length === nextEvents.length &&
-            cellEvents.every((ev, idx) =>
-              nextEvents[idx] &&
-              ev.summary === nextEvents[idx].summary &&
-              ev.start.getTime() === nextEvents[idx].start.getTime() &&
-              ev.end.getTime() === nextEvents[idx].end.getTime()
-            );
-
-          if (eventsMatch) {
-            span++;
-          } else if (!cellEvents.length && !nextEvents.length) {
-            // Both are available, merge
-            span++;
-          } else {
-            break;
-          }
-        }
-        rendered[localC] = span - 1;
-
-        const classes = ["cell"];
-
-        if (cellEvents.length) {
-          if (cellEvents.length === 1) {
-            const ev = cellEvents[0];
-            const evStart = ev.start;
-            const evEnd = ev.end;
-            const isReservation = ev.summary.includes("Reservation");
-            const isCheckout = ev.summary.includes("Checkout");
-            let isLate = false;
-            if (isReservation) isLate = evStart < new Date(Date.now() - 30 * 60 * 1000);
-            if (isCheckout) isLate = evEnd < new Date();
-
-            let label = isReservation ? "Reservation" : isCheckout ? "Checkout" : "Booked";
-            if (isReservation) classes.push("reservation");
-            else if (isCheckout) classes.push("checkout");
-            else classes.push("booked");
-            if (isLate) { classes.push("late"); label = "Late " + label; }
-
-            displayText = `${label}<br>${evStart.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} - ${evEnd.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
-          } else if (cellEvents.length > 1) {
-            classes.push("multiple");
-            // Show events whose start time falls within this slot's range
-            const slotStart = new Date(currentDate);
-            slotStart.setHours(slotHour, slotMinute, 0, 0);
-
-            let slotEnd;
-            if (r < slots.length - 1) {
-              const [nextHour, nextMinute] = slots[r + 1].split(":").map(Number);
-              slotEnd = new Date(currentDate);
-              slotEnd.setHours(nextHour, nextMinute, 0, 0);
-            } else {
-              const hours = getHoursForDate(currentDate);
-              slotEnd = new Date(currentDate);
-              slotEnd.setHours(hours.end - 1, 0, 0, 0);
-            }
-
-            const eventsToShow = cellEvents.filter(ev =>
-              ev.start >= slotStart && ev.start < slotEnd
-            );
-
-            displayText = eventsToShow.map(ev => {
-              const evStart = ev.start;
-              const evEnd = ev.end;
-              const isReservation = ev.summary.includes("Reservation");
-              const isCheckout = ev.summary.includes("Checkout");
-              let isLate = false;
-              if (isReservation) isLate = evStart < new Date(Date.now() - 30 * 60 * 1000);
-              if (isCheckout) isLate = evEnd < new Date();
-
-              let label = isReservation ? "Reservation" : isCheckout ? "Checkout" : "Booked";
-              let eventClass = isReservation ? "blueGloss" : isCheckout ? "greenGloss" : "greyGloss";
-              if (isLate) label = "Late " + label;
-
-              return `<div class="${eventClass}">${label}<br>${evStart.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} - ${evEnd.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</div>`;
-            }).join('<hr style="border:none;border-top:1px solid #555;margin:4px 0;">');
-          }
-        } else {
-          classes.push("available");
-
-          let nextEventTime = null;
-          for (let k = r + 1; k < slots.length; k++) {
-            if (tableData[k][c].length) {
-              nextEventTime = tableData[k][c][0].start;
-              break;
-            }
-          }
-          if (!nextEventTime) {
-            const hours = getHoursForDate(currentDate);
-            nextEventTime = new Date(currentDate);
-            nextEventTime.setHours(hours.end - 1, 0, 0, 0);
-          }
-
-          if (nextEventTime < new Date()) displayText = "";
-          else if (slotTime < new Date()) displayText = `Available until<br>${nextEventTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
-          else displayText = `Available<br>${slotTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} - ${nextEventTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
-        }
-
-        html += `<td class="${classes.join(" ")}" rowspan="${span}">${displayText}</td>`;
+      let span = 1;
+      for (let j = i + 1; j < sortedBreaks.length - 1; j++) {
+        const nextStart = sortedBreaks[j];
+        const nextEnd = sortedBreaks[j + 1];
+        const nextSeg = timelines[idx].find(s => s.start <= nextStart && s.end >= nextEnd);
+        if (nextSeg && nextSeg.type === seg.type && seg.start.getTime() === nextSeg.start.getTime() && seg.end.getTime() === nextSeg.end.getTime()) {
+          span++;
+        } else break;
       }
-      html += "</tr>";
-    }
+      rowspanRemaining[idx] = span - 1;
 
-    // Add "Closing" and "Closed" rows
-    const hours = getHoursForDate(currentDate);
+      let classes = ["cell", seg.type];
+      let label = "";
+
+      if (seg.type === "available") {
+        if (seg.end < now) {
+          classes.push("past");
+          label = "";
+        } else if (seg.start <= now && seg.end > now) {
+          classes.push("current");
+          label = `Available until<br>${seg.end.toLocaleTimeString("en-US", {hour:"numeric", minute:"2-digit", hour12:true})}`;
+        } else {
+          classes.push("upcoming");
+          if (rowStart.toDateString() === now.toDateString()) {
+            label = `Available until<br>${seg.end.toLocaleTimeString("en-US", {hour:"numeric", minute:"2-digit", hour12:true})}`;
+          } else {
+            label = `Available<br>${seg.start.toLocaleTimeString("en-US", {hour:"numeric", minute:"2-digit", hour12:true})} – ${seg.end.toLocaleTimeString("en-US", {hour:"numeric", minute:"2-digit", hour12:true})}`;
+          }
+        }
+      } else if (seg.type === "error") {
+        label = "Error";
+      } else {
+        // Reservation / Checkout / Booked
+        label = `${seg.type.charAt(0).toUpperCase() + seg.type.slice(1)}<br>${seg.start.toLocaleTimeString("en-US", {hour:"numeric", minute:"2-digit", hour12:true})} – ${seg.end.toLocaleTimeString("en-US", {hour:"numeric", minute:"2-digit", hour12:true})}`;
+
+        // 🟢 Late conditions:
+        if (seg.type === "checkout" && now > seg.end) {
+          classes.push("late");
+          label += " (Late)";
+        }
+        if (seg.type === "reservation" && now > new Date(seg.start.getTime() + 30 * 60000)) {
+          classes.push("late");
+          label += "<br>NO SHOW";
+        }
+      }
+
+      html += `<td class="${classes.join(" ")}" rowspan="${span}">${label}</td>`;
+    });
+
+    html += "</tr>";
+  }
+
+  if (hours) {
     const closingMinus1 = new Date(currentDate);
     closingMinus1.setHours(hours.end - 1, 0, 0, 0);
-    const closingMinus1Label = closingMinus1.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-
+    const closingMinus1Label = closingMinus1.toLocaleTimeString("en-US", { hour: "numeric", minute:"2-digit", hour12:true });
     html += `<tr><td class="timeCell">${closingMinus1Label}</td>`;
-    for (let c = feedStart; c < feedEnd; c++) {
-      html += `<td class="cell unavailable">Studios Closing</td>`;
-    }
-    html += `</tr>`;
+    for (let c=0;c<feeds.length;c++) { html += `<td class="cell unavailable">Studios Closing</td>`; }
+    html += "</tr>";
 
     const closingTime = new Date(currentDate);
     closingTime.setHours(hours.end, 0, 0, 0);
-    const closingLabel = closingTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-
+    const closingLabel = closingTime.toLocaleTimeString("en-US", { hour:"numeric", minute:"2-digit", hour12:true});
     html += `<tr><td class="timeCell">${closingLabel}</td>`;
-    for (let c = feedStart; c < feedEnd; c++) {
-      html += `<td class="cell unavailable">Campus Closed</td>`;
-    }
-    html += `</tr>`;
-
-    html += `</table>`;
-    allTablesHtml += html;
+    for (let c=0;c<feeds.length;c++) { html += `<td class="cell unavailable">Campus Closed</td>`; }
+    html += "</tr>";
   }
 
+  html += "</table>";
+  return html;
+}
+
+// ---------------- Build Calendar ----------------
+async function buildCalendar() {
+  const table = document.getElementById("calendarTable");
+  if (feeds.length === 0) return;
+
+  const timelines = buildAccurateTimeline(feeds, currentDate);
+  const feedsPerTable = calculateFeedsPerTable();
+  const tableCount = Math.ceil(feeds.length / feedsPerTable);
+  const baseSize = Math.floor(feeds.length / tableCount);
+  const remainder = feeds.length % tableCount;
+
+  let index = 0;
+  let allTablesHtml = "";
+  for (let t=0; t<tableCount; t++) {
+    const thisSize = baseSize + (t < remainder ? 1 : 0);
+    const start = index;
+    const end = start + thisSize;
+    const slicedFeeds = feeds.slice(start,end);
+    const slicedTimelines = timelines.slice(start,end);
+    const html = renderCalendarTable(slicedFeeds,slicedTimelines);
+    allTablesHtml += `<div style="margin-bottom:24px;">${html}</div>`;
+    index = end;
+  }
   table.innerHTML = allTablesHtml;
 }
 
-function refreshCalendar(){ buildCalendar().catch(err=>console.error(err)); }
+function refreshCalendar() { buildCalendar().catch(err=>console.error(err)); }
+
+// ---------------- Auto Refresh ----------------
+function startAutoRefresh(intervalMs = 60000) {
+  setInterval(async () => {
+    try {
+      console.log("🔄 Auto-refreshing feeds...");
+      const data = await fetchFeedsParallelWithProgress();
+      if (data) {  // safe update only
+        feeds = data;
+        refreshCalendar();
+      }
+    } catch (err) {
+      console.error("Auto-refresh failed:", err);
+    }
+  }, intervalMs);
+}
 
 // ---------------- Initial Load ----------------
 setHeaderTitle();
-document.body.prepend(document.getElementById("progressContainer")); // Move loading bar to top if not already
+document.body.prepend(document.getElementById("progressContainer"));
 addNavButtons();
 clearCalendar();
 
 fetchFeedsParallelWithProgress()
-  .then(data=>{ feeds=data; refreshCalendar(); setInterval(refreshCalendar,60000); })
-  .catch(err=>console.error(err));
+  .then(data => { 
+    if (data) {              // ✅ only set feeds if valid data returned
+      feeds = data; 
+      refreshCalendar();
+    }
+    startAutoRefresh();       // auto-refresh still starts regardless
+  })
+  .catch(err => console.error(err));
 
-window.addEventListener("resize", () => {
-  refreshCalendar();
-});
+window.addEventListener("resize", ()=>{ refreshCalendar(); });
