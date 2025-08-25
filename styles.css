@@ -11,6 +11,7 @@
   --checkout: #4caf50;
   --booked: #444;
   --late-text: #FAA;
+  --defaultSize: 12px;
 }
 
 html, body {
@@ -21,7 +22,7 @@ html, body {
 body {
   margin: 1px;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,"Noto Sans", "Liberation Sans", sans-serif;
-  font-size: 12px;
+  font-size: var(--defaultSize);
   color: var(--text);
   /*background: url("starfield.jpg");*/
   background-color: var(--bg);
@@ -29,6 +30,11 @@ body {
 }
 
 #calendarHeader {
+  text-align: center;
+  margin: 10px 0 5px;
+}
+
+.calendarHeader {
   text-align: center;
   margin: 10px 0 5px;
 }
@@ -45,7 +51,7 @@ body {
   margin: 10px 0;
 }
 
-#calendarNav button {
+#calendarNav button, .calendarNavDup button {
   background: var(--panel);
   color: var(--text);
   border: 1px solid var(--border);
@@ -59,7 +65,7 @@ body {
   border-radius: 16px;
 }
 
-#calendarNav button:hover {
+#calendarNav button:hover, .calendarNavDup button:hover{
   filter: brightness(1.2);
 }
 
