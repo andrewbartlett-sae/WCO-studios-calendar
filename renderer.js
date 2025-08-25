@@ -4,12 +4,21 @@ import { weekTypes, weekTypeRanges, singleDayOverrides } from "./calendarConfig.
 const webAppUrl = "https://script.google.com/macros/s/AKfycbxcb7lxSS6CvmhXfqNFku5wxxu-2JVk5xiKgNAHxXc5AAVdYeYhvkjDRhND-n49z0sj/exec";
 
 // ---------------- URL Params → CSS Variable ----------------
-(function applySizeParam() {
+(function applyParams() {
   const params = new URLSearchParams(window.location.search);
+
+  // 🔠 Handle font size
   const size = params.get("size");
   if (size && !isNaN(size)) {
     document.documentElement.style.setProperty("--defaultSize", `${size}px`);
     console.log(`✅ Applied --defaultSize: ${size}px`);
+  }
+
+  // 🛑 Handle navigation visibility
+  const navParam = params.get("nav");
+  if (navParam === "0" || navParam?.toLowerCase() === "false") {
+    document.documentElement.dataset.hideNav = "true";
+    console.log("🚫 Navigation controls hidden via URL parameter");
   }
 })();
 
@@ -141,6 +150,8 @@ function setHeaderTitle() {
 }
 
 function addNavButtons() {
+  if (document.documentElement.dataset.hideNav === "true") return; // 🚫 Skip controls
+
   let nav = document.getElementById("calendarNav");
   if (!nav) {
     nav = document.createElement("div");
@@ -182,7 +193,7 @@ function addNavButtons() {
 
     // 📌 Group day navigation buttons (Prev / Today / Next)
     const dayNav = document.createElement("div");
-    dayNav.className = "dayNavGroup"; // styled with flexbox in CSS
+    dayNav.className = "dayNavGroup";
 
     const prevBtn = document.createElement("button");
     prevBtn.textContent = "← Previous Day";
@@ -191,7 +202,7 @@ function addNavButtons() {
 
     const todayBtn = document.createElement("button");
     todayBtn.textContent = "Today";
-    todayBtn.onclick = () => changeToToday(); // top nav (no scroll)
+    todayBtn.onclick = () => changeToToday();
     dayNav.appendChild(todayBtn);
 
     const nextBtn = document.createElement("button");
@@ -199,7 +210,6 @@ function addNavButtons() {
     nextBtn.onclick = () => changeDay(1);
     dayNav.appendChild(nextBtn);
 
-    // Add grouped navigation buttons to nav
     nav.appendChild(dayNav);
   }
 }
@@ -382,7 +392,7 @@ function renderCalendarTable(feeds, timelines) {
       } else if(seg.type==="error"){label="Error";}
       else {
         label=`${seg.type.charAt(0).toUpperCase()+seg.type.slice(1)}<br>${seg.start.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true})} – ${seg.end.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true})}`;
-        if(seg.type==="checkout"&&now>seg.end){classes.push("late");label+=" (Late)";}
+        if(seg.type==="checkout"&&now>seg.end){classes.push("late");label ="Late " + label;}
         if(seg.type==="reservation"&&now>new Date(seg.start.getTime()+30*60000)){classes.push("late");label+="<br>NO SHOW";}
       }
 
@@ -427,7 +437,7 @@ async function buildCalendar() {
   const today=new Date();
   const isToday=currentDate.toDateString()===today.toDateString();
   const headerHtml=`<h2 class="calendarHeader ${isToday?"neonOrange":""}">${headerText}</h2>`;
-  const navHtml=`
+  const navHtml = document.documentElement.dataset.hideNav === "true" ? "" : `
     <div class="calendarNavDup" style="text-align:center; margin:10px 0;">
       <button type="button" onclick="changeDay(-1,this)">← Previous Day</button>
       <button type="button" onclick="changeToToday(this)">Today</button>
