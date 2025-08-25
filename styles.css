@@ -359,17 +359,3 @@ body {
   background: -webkit-linear-gradient(top, transparent, #333); 
   background: linear-gradient(top, transparent, #333); color:#666;
 }
-
-
-/* Smartphones only (adjust width as you like) */
-@media screen and (max-width: 768px) {
-  /* Make "Available" and event cell text bigger */
-  .calendarTable td.cell.available,
-  .calendarTable td.cell.reservation,
-  .calendarTable td.cell.checkout,
-  .calendarTable td.cell.booked,
-  .calendarTable td.cell.late {
-    font-size: 16px;    /* bigger than the default 12px */
-    /*line-height: 1.4;*/   /* add spacing to improve readability */
-  }
-}
