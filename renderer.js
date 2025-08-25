@@ -1,7 +1,7 @@
 import { weekTypes, weekTypeRanges, singleDayOverrides } from "./calendarConfig.js";
 
 // ---------------- URLs ----------------
-const webAppUrl = "https://script.google.com/macros/s/AKfycbx9jkp7LBvqK-blWWu08W2rs7ci_ZvYAJLTmNF8zP_wN6qDVWC_mHQdBZZ3uorXvCwR/exec";
+const webAppUrl = "https://script.google.com/macros/s/AKfycbz2spQL8hbqIz8cK-XM4TDwzaRJO4lnN3M-oh2YtifX9mSCtfhq252cfWBX_9ilrg-q/exec";
 
 // ---------------- URL Params → CSS Variable ----------------
 (function applyParams() {
