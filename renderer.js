@@ -147,6 +147,13 @@ function addNavButtons() {
     nav.id = "calendarNav";
     document.body.prepend(nav);
 
+    // 📌 Add label before date picker
+    const dateLabel = document.createElement("span");
+    dateLabel.textContent = "Select Date: ";
+    dateLabel.style.marginRight = "6px";
+    nav.appendChild(dateLabel);
+
+    // 📅 Date input field
     const dateInput = document.createElement("input");
     dateInput.type = "date";
     dateInput.style.marginLeft = "10px";
@@ -161,28 +168,39 @@ function addNavButtons() {
     };
     nav.appendChild(dateInput);
 
+    // 🔄 Refresh button
     const refreshBtn = document.createElement("button");
     refreshBtn.textContent = "Refresh";
     refreshBtn.onclick = async () => {
       const data = await fetchFeedsParallelWithProgress();
-      if (data) { feeds = data; refreshCalendar(); }
+      if (data) {
+        feeds = data;
+        refreshCalendar();
+      }
     };
     nav.appendChild(refreshBtn);
+
+    // 📌 Group day navigation buttons (Prev / Today / Next)
+    const dayNav = document.createElement("div");
+    dayNav.className = "dayNavGroup"; // styled with flexbox in CSS
 
     const prevBtn = document.createElement("button");
     prevBtn.textContent = "← Previous Day";
     prevBtn.onclick = () => changeDay(-1);
-    nav.appendChild(prevBtn);
+    dayNav.appendChild(prevBtn);
 
     const todayBtn = document.createElement("button");
     todayBtn.textContent = "Today";
     todayBtn.onclick = () => changeToToday(); // top nav (no scroll)
-    nav.appendChild(todayBtn);
+    dayNav.appendChild(todayBtn);
 
     const nextBtn = document.createElement("button");
     nextBtn.textContent = "Next Day →";
     nextBtn.onclick = () => changeDay(1);
-    nav.appendChild(nextBtn);
+    dayNav.appendChild(nextBtn);
+
+    // Add grouped navigation buttons to nav
+    nav.appendChild(dayNav);
   }
 }
 
