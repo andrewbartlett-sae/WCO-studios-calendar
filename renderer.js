@@ -243,7 +243,7 @@ function buildAccurateTimeline(feeds, currentDate) {
   if (!hours) return [];
 
   const startOfDay = new Date(currentDate);
-  startOfDay.setHours(hours.start, 0, 0, 0);
+  startOfDay.setHours(hours.start, 10, 0, 0); // ⏰ day starts HH:10
 
   const endOfDay = new Date(currentDate);
   endOfDay.setHours(hours.end, 0, 0, 0);
@@ -356,7 +356,13 @@ function renderCalendarTable(feeds, timelines) {
   if (hours) {
     for (let h = hours.start; h < hours.end - 1; h++) {
       const anchor = new Date(currentDate);
-      anchor.setHours(h, 0, 0, 0);
+
+      if (h === hours.start) {
+        anchor.setHours(h, 10, 0, 0); // first row starts HH:10
+      } else {
+        anchor.setHours(h, 0, 0, 0);  // all others start on the hour
+      }
+
       breakpoints.add(anchor.getTime());
     }
   }
