@@ -16,6 +16,7 @@
 
 html, body {
   forced-color-adjust: none;
+  touch-action: manipulation;
 }
 
 /* General Layout */
