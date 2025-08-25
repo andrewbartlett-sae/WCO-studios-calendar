@@ -402,18 +402,23 @@ function renderCalendarTable(feeds, timelines) {
     html+="</tr>";
   }
 
-  // add closing rows
-  if(hours){
-    const c1=new Date(currentDate);c1.setHours(hours.end-1,0,0,0);
-    const c1Label=c1.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true});
-    html+=`<tr><td class="timeCell">${c1Label}</td>`;
-    for(let c=0;c<feeds.length;c++){html+=`<td class="cell unavailable">Studios Closing</td>`;}
-    html+="</tr>";
-    const c2=new Date(currentDate);c2.setHours(hours.end,0,0,0);
-    const c2Label=c2.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true});
-    html+=`<tr><td class="timeCell">${c2Label}</td>`;
-    for(let c=0;c<feeds.length;c++){html+=`<td class="cell unavailable">Campus Closed</td>`;}
-    html+="</tr>";
+  // Add closing rows
+  if (hours) {
+    const now = new Date();
+
+    const c1 = new Date(currentDate); c1.setHours(hours.end - 1, 0, 0, 0);
+    const c1Label = c1.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+    const isCurrentC1 = c1.getHours() === now.getHours() && c1.toDateString() === now.toDateString();
+    html += `<tr><td class="timeCell${isCurrentC1 ? " currentTimeCell" : ""}">${c1Label}</td>`;
+    for (let c = 0; c < feeds.length; c++) { html += `<td class="cell unavailable">Studios Closing</td>`; }
+    html += "</tr>";
+
+    const c2 = new Date(currentDate); c2.setHours(hours.end, 0, 0, 0);
+    const c2Label = c2.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+    const isCurrentC2 = c2.getHours() === now.getHours() && c2.toDateString() === now.toDateString();
+    html += `<tr><td class="timeCell${isCurrentC2 ? " currentTimeCell" : ""}">${c2Label}</td>`;
+    for (let c = 0; c < feeds.length; c++) { html += `<td class="cell unavailable">Campus Closed</td>`; }
+    html += "</tr>";
   }
 
   html+="</table>";
