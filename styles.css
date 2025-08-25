@@ -1,4 +1,4 @@
-:root {#calendarTable th, #c
+:root {
   color-scheme: dark;
   --bg: #000;
   --panel: #1e1e1e;
@@ -60,7 +60,31 @@ body {
 }
 
 #calendarNav button:hover {
-  filter: brightness(1.1);
+  filter: brightness(1.2);
+}
+
+#calendarNav input[type="date"] {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  font-size: 16px;
+  padding: 8px 12px;
+  border-radius: 16px;
+  margin: 0 20px 0 0;
+  cursor: pointer;
+}
+
+/* On hover/focus, match button behaviour */
+#calendarNav input[type="date"]:hover,
+#calendarNav input[type="date"]:focus {
+  filter: brightness(1.2);
+  outline: none;
+}
+
+/* Remove default calendar icon background on some browsers */
+#calendarNav input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1); /* make sure it's visible in dark mode */
+  cursor: pointer;
 }
 
 /* Table */
@@ -173,6 +197,14 @@ body {
   letter-spacing: 2px;
 }
 
+.calendarTable th:first-child,
+.calendarTable td.timeCell {
+  width: 80px;
+  min-width: 80px;
+  max-width: 80px;
+  white-space: nowrap;
+}
+
 #progressContainer {
   width: 100%;
   height: 20px;
@@ -180,22 +212,23 @@ body {
   margin: 10px 0;
   border-radius: 4px;
   overflow: hidden;
-  background: transparent;
-  transition: background 0.2s;
   box-sizing: border-box;
-  /* Always reserve space, even when not loading */
+  background: transparent;
+  transition: background 0.3s, opacity 0.5s; /* add smoothness */
+  opacity: 0; /* default hidden */
 }
 
 #progressContainer.loading {
   background: #eee;
+  opacity: 1; /* visible while loading */
 }
 
 #progressBar {
   height: 100%;
   width: 0%;
-  background: #4caf50;
-  transition: width 0.2s;
-  display: none;
+  background: linear-gradient(to right, #FA0, #4caf50); /* blue→green */
+  transition: width 0.3s linear;
+  box-shadow: 0 0 5px rgba(0,0,0,0.2);
 }
 
 #progressContainer.loading #progressBar {
@@ -325,19 +358,4 @@ body {
   background: -o-linear-gradient(top, transparent, #333); 
   background: -webkit-linear-gradient(top, transparent, #333); 
   background: linear-gradient(top, transparent, #333); color:#666;
-}
-
-.calendarTable td.cell.multiple {
-  background: var(--panel);
-  color: var(--eventText);
-  font-size: 1em;
-  padding: 4px 2px;
-  vertical-align: top;
-}
-
-.calendarTable td.cell.multiple div {
-  margin: 2px 0;
-  padding: 4px 6px;
-  border-radius: 6px;
-  font-weight: bold;
 }
